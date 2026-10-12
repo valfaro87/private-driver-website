@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Private chauffeur and limousine transportation. Request a ride for airport transfers, business travel, and special occasions.">
+  <meta name="theme-color" content="#101010">
+  <title>Private Driver | Professional Chauffeur Service</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#111;--gold:#c8a96b;--cream:#f6f3ed;--muted:#b8b4ad;--panel:#191919;--line:#34312b}
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--ink);color:#f7f5f0;font-family:"DM Sans",Arial,sans-serif;line-height:1.6}
+    a{color:inherit}
+    .wrap{width:min(1120px,calc(100% - 40px));margin:auto}
+    .topbar{border-bottom:1px solid #2b2925;background:#0c0c0c}
+    .nav{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px 0}
+    .brand{font-size:13px;letter-spacing:.2em;text-transform:uppercase;font-weight:700}
+    .brand span{color:var(--gold)}
+    .navlinks{display:flex;gap:24px;align-items:center;font-size:13px;color:#ddd}
+    .navlinks a{text-decoration:none}
+    .navlinks a:hover{color:var(--gold)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border:1px solid var(--gold);background:var(--gold);color:#15130f;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:.2s}
+    .btn:hover{background:#ddc28b}
+    .btn.secondary{background:transparent;color:var(--gold)}
+    .hero{position:relative;overflow:hidden;background:radial-gradient(ellipse at 75% 25%,#3b3326 0%,#171614 38%,#101010 75%);border-bottom:1px solid var(--line)}
+    .hero:after{content:"";position:absolute;width:420px;height:420px;border:1px solid #c8a96b25;border-radius:50%;right:-100px;top:40px;box-shadow:0 0 0 45px #c8a96b09,0 0 0 90px #c8a96b06;pointer-events:none}
+    .hero-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:55px;align-items:center;padding:90px 0 95px;position:relative;z-index:1}
+    .eyebrow{color:var(--gold);font-size:11px;letter-spacing:.23em;text-transform:uppercase;font-weight:700}
+    h1,h2,h3{font-family:"Playfair Display",Georgia,serif;font-weight:500;line-height:1.12}
+    h1{font-size:clamp(42px,6vw,72px);margin:18px 0 22px;max-width:700px}
+    h1 em{color:var(--gold);font-style:normal}
+    .hero p{color:#c8c4bc;max-width:560px;font-size:16px}
+    .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+    .hero-note{margin-top:22px;color:#9f9a91;font-size:12px}
+    .hero-card{border:1px solid #62543a;background:linear-gradient(145deg,#211f1a,#111);padding:34px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between}
+    .monogram{font-family:"Playfair Display",Georgia,serif;font-size:72px;color:var(--gold);line-height:1}
+    .hero-card h3{font-size:27px;margin:25px 0 8px}
+    .hero-card p{font-size:13px;margin:0;color:#bdb8ae}
+    .license{display:inline-flex;gap:9px;align-items:center;color:#e5d6b6;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-top:24px}
+    .dot{width:7px;height:7px;background:var(--gold);border-radius:50%}
+    section{padding:78px 0}
+    .section-head{max-width:650px;margin-bottom:35px}
+    .section-head h2{font-size:clamp(32px,4vw,47px);margin:12px 0}
+    .section-head p{color:#bdb8ae;margin:0}
+    .services{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+    .service{background:var(--panel);border:1px solid #302d27;padding:25px}
+    .service .num{color:var(--gold);font-size:11px;letter-spacing:.15em}
+    .service h3{font-size:23px;margin:16px 0 10px}
+    .service p{color:#bdb8ae;font-size:13px;margin:0}
+    .booking{background:var(--cream);color:#171613}
+    .booking .section-head p{color:#5d5952}
+    .booking-grid{display:grid;grid-template-columns:.75fr 1.25fr;gap:45px;align-items:start}
+    .booking-aside{background:#e9e3d8;padding:28px;border-left:3px solid var(--gold)}
+    .booking-aside h3{font-size:25px;margin:0 0 12px}
+    .booking-aside p,.booking-aside li{font-size:13px;color:#514d46}
+    .booking-aside ul{padding-left:18px}
+    form{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+    .field{display:flex;flex-direction:column;gap:7px}
+    .field.full{grid-column:1/-1}
+    label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+    input,select,textarea{width:100%;border:1px solid #c9c2b5;background:#fffdf9;color:#1b1a17;border-radius:0;padding:13px;font:inherit;font-size:14px}
+    textarea{min-height:100px;resize:vertical}
+    .form-note{grid-column:1/-1;font-size:11px;color:#5d5952}
+    .form-submit{grid-column:1/-1;display:flex;gap:15px;align-items:center;flex-wrap:wrap}
+    .payments{background:#151513}
+    .payment-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .pay{border:1px solid #39352e;padding:20px;text-align:center;background:#1b1a17}
+    .pay strong{display:block;color:var(--gold);font-size:14px;margin-bottom:5px}
+    .pay span{font-size:11px;color:#bdb8ae}
+    .pay-note{font-size:12px;color:#9e998f;margin-top:18px}
+    .contact{display:grid;grid-template-columns:1fr 1fr;gap:45px;align-items:center}
+    .contact h2{font-size:clamp(32px,4vw,47px);margin:12px 0}
+    .contact p{color:#bdb8ae}
+    .contact-card{border:1px solid var(--line);padding:28px}
+    .contact-row{padding:13px 0;border-bottom:1px solid var(--line)}
+    .contact-row:last-child{border:0}
+    .contact-row small{display:block;color:var(--gold);font-size:10px;letter-spacing:.15em;text-transform:uppercase}
+    .contact-row a,.contact-row span{font-size:15px;text-decoration:none;overflow-wrap:anywhere}
+    footer{border-top:1px solid var(--line);padding:24px 0;color:#8f8a81;font-size:11px}
+    .footer-inner{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}
+    .privacy{max-width:750px}
+    @media(max-width:800px){.hero-grid,.booking-grid,.contact{grid-template-columns:1fr}.hero-grid{padding:65px 0;gap:30px}.hero-card{min-height:240px}.services{grid-template-columns:1fr}.payment-grid{grid-template-columns:repeat(2,1fr)}.navlinks{gap:12px}.navlinks a:not(.btn){display:none}}
+    @media(max-width:500px){.wrap{width:min(100% - 28px,1120px)}section{padding:58px 0}form{grid-template-columns:1fr}.field.full,.form-note,.form-submit{grid-column:1}.nav .btn{padding:10px 12px;font-size:10px}.hero-actions .btn{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="wrap nav">
+      <a class="brand" href="#home" aria-label="Home">PRIVATE <span>DRIVER</span></a>
+      <nav class="navlinks" aria-label="Main navigation">
+        <a href="#services">Services</a><a href="#booking">Book a ride</a><a href="#payments">Payments</a><a href="#contact">Contact</a>
+        <a class="btn" href="#booking">Request a ride</a>
+      </nav>
+    </div>
+  </div>
+  <main>
+    <header class="hero" id="home">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow">Personal Chauffeur • Professional Service</div>
+          <h1>Your time.<br>Your journey.<br><em>Handled with care.</em></h1>
+          <p>Dependable, personalized private transportation for airport transfers, business travel, appointments, and special occasions. Enjoy a thoughtful, professional ride experience from pickup to destination.</p>
+          <div class="hero-actions">
+            <a class="btn" href="#booking">Request a ride</a>
+            <a class="btn secondary" href="#contact">Contact the driver</a>
+          </div>
+          <div class="hero-note">Advance requests recommended. Every ride is subject to availability and confirmation.</div>
+        </div>
+        <aside class="hero-card">
+          <div>
+            <div class="monogram">PD.</div>
+            <h3>Private travel, elevated.</h3>
+            <p>Personal attention. Clear communication. A service built around your schedule.</p>
+          </div>
+          <div class="license"><span class="dot"></span> Limousine licensed</div>
+        </aside>
+      </div>
+    </header>
+
+    <section id="services">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Transportation services</div>
+          <h2>Arrive with confidence.</h2>
+          <p>Choose the ride that fits your plans. Share your details through the request form and the driver will follow up to confirm availability and pricing.</p>
+        </div>
+        <div class="services">
+          <article class="service"><div class="num">01 / AIRPORT</div><h3>Airport Transfers</h3><p>Plan a pickup or drop-off with your flight and timing details included in the request.</p></article>
+          <article class="service"><div class="num">02 / BUSINESS</div><h3>Business & Appointments</h3><p>Private transportation for meetings, appointments, and busy days with multiple stops.</p></article>
+          <article class="service"><div class="num">03 / PERSONAL</div><h3>Special Occasions</h3><p>Arrange transportation for dinners, celebrations, events, and other important plans.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="booking" id="booking">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Ride request</div>
+          <h2>Where can I take you?</h2>
+          <p>Tell me a little about your trip. Your request is not confirmed until you receive a reply.</p>
+        </div>
+        <div class="booking-grid">
+          <aside class="booking-aside">
+            <h3>Booking made personal.</h3>
+            <p>Share your trip details and preferred way to be contacted. I will review the request and follow up about availability, the fare, and payment.</p>
+            <ul>
+              <li>Pickup and destination details</li>
+              <li>Date, time, and passenger count</li>
+              <li>One-way or round-trip requests</li>
+              <li>Optional notes for your trip</li>
+            </ul>
+            <p><strong>Please note:</strong> Do not include payment card numbers, medical information, or other sensitive details in this form.</p>
+          </aside>
+          <form id="rideForm">
+            <div class="field"><label for="name">Full name *</label><input id="name" name="name" autocomplete="name" required></div>
+            <div class="field"><label for="phone">Phone number *</label><input id="phone" name="phone" type="tel" autocomplete="tel" required></div>
+            <div class="field full"><label for="email">Email address *</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+            <div class="field full"><label for="pickup">Pickup address *</label><input id="pickup" name="pickup" required placeholder="Street address, airport, or landmark"></div>
+            <div class="field full"><label for="destination">Destination address *</label><input id="destination" name="destination" required placeholder="Where would you like to go?"></div>
+            <div class="field"><label for="date">Pickup date *</label><input id="date" name="date" type="date" required></div>
+            <div class="field"><label for="time">Pickup time *</label><input id="time" name="time" type="time" required></div>
+            <div class="field"><label for="passengers">Passengers *</label><select id="passengers" name="passengers" required><option value="">Select</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option></select></div>
+            <div class="field"><label for="trip">Trip type *</label><select id="trip" name="trip" required><option value="">Select</option><option>One-way</option><option>Round trip</option><option>Multiple stops</option></select></div>
+            <div class="field full"><label for="notes">Additional details (optional)</label><textarea id="notes" name="notes" placeholder="Return pickup details, flight number, luggage, or other trip notes"></textarea></div>
+            <div class="form-note">Your request will be saved to the business booking database. The driver will contact you to confirm availability and pricing. Please do not include payment card numbers or sensitive personal information.</div>
+            <div class="form-submit"><button class="btn" type="submit">Prepare ride request</button><span id="formStatus" role="status" aria-live="polite" style="font-size:12px"></span></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="payments" id="payments">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Flexible payment</div>
+          <h2>Pay your way.</h2>
+          <p>Payment is arranged directly with the driver after the fare is confirmed. Select payment options below only after adding your official payment links.</p>
+        </div>
+        <div class="payment-grid">
+          <div class="pay"><strong>Credit & Debit</strong><span>Visa, Mastercard, and supported cards</span></div>
+          <div class="pay"><strong>Apple Pay</strong><span>When supported by your payment provider</span></div>
+          <div class="pay"><strong>Google Pay</strong><span>When supported by your payment provider</span></div>
+          <div class="pay"><strong>PayPal / Zelle</strong><span>Available if enabled by the driver</span></div>
+        </div>
+        <p class="pay-note">Payment processing is not activated by this starter website. Add your own secure payment links from a provider such as Square, Stripe, or PayPal. Never collect card details directly on this website.</p>
+        <div class="tip-note" style="margin-top:24px;border:1px solid #62543a;background:#1b1a17;padding:22px;display:flex;gap:16px;align-items:flex-start">
+          <div aria-hidden="true" style="font-size:28px;color:var(--gold)">♡</div>
+          <div>
+            <h3 style="font-size:22px;margin:0 0 8px">Optional gratuity</h3>
+            <p style="font-size:13px;color:#bdb8ae;margin:0">If you enjoyed your ride, tips are always appreciated but never expected. After your trip is completed, you may choose to leave an optional tip using the driver's approved payment method. Tips are entirely voluntary and do not affect the service you receive.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="wrap contact">
+        <div>
+          <div class="eyebrow">Get in touch</div>
+          <h2>Let's plan your next ride.</h2>
+          <p>Have a question or need to discuss a custom trip? Contact me directly. For fastest service, include your pickup date and general route.</p>
+          <a class="btn" href="#booking">Request a ride</a>
+        </div>
+        <div class="contact-card">
+          <div class="contact-row"><small>Business name</small><span data-setting="businessName">Your Business Name</span></div>
+          <div class="contact-row"><small>Phone</small><a data-link="phone" href="tel:+10000000000" data-setting="phoneDisplay">(Add your business phone)</a></div>
+          <div class="contact-row"><small>Email</small><a data-link="email" href="mailto:replace@example.com" data-setting="email">Add your business email</a></div>
+          <div class="contact-row"><small>Service area</small><span data-setting="serviceArea">Houston, Texas and surrounding areas</span></div>
+          <div class="contact-row"><small>Licensing</small><span>Limousine licensed</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <div class="wrap footer-inner">
+      <span>© <span id="year"></span> <span data-setting="businessName">Your Business Name</span>. All rights reserved.</span>
+      <span>Professional private transportation</span>
+      <p class="privacy">Privacy note: this starter site does not use analytics or a database. The ride-request form prepares an email on the visitor's device; it does not transmit or store the request by itself. Public contact details are visible to anyone who visits the published website.</p>
+    </div>
+  </footer>
+  <script src="site-settings.js"></script>
+  <script>
+    const settings = window.SITE_SETTINGS || {};
+    document.querySelectorAll('[data-setting]').forEach(el => {
+      const key = el.dataset.setting;
+      if (settings[key]) el.textContent = settings[key];
+    });
+    const email = settings.email || 'replace@example.com';
+    const phone = settings.phone || '';
+    document.querySelectorAll('[data-link="email"]').forEach(el => {
+      el.href = 'mailto:' + email;
+      if (settings.email) el.textContent = settings.email;
+    });
+    document.querySelectorAll('[data-link="phone"]').forEach(el => {
+      el.href = phone ? 'tel:' + phone.replace(/[^\d+]/g, '') : '#contact';
+      if (settings.phoneDisplay) el.textContent = settings.phoneDisplay;
+    });
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const dateField = document.getElementById('date');
+    dateField.min = new Date().toISOString().split('T')[0];
+    document.getElementById('rideForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const form = this;
+      const status = document.getElementById('formStatus');
+      const button = form.querySelector('button[type="submit"]');
+      const d = new FormData(form);
+      const payload = Object.fromEntries(d.entries());
+      status.textContent = 'Submitting your ride request securely…';
+      button.disabled = true;
+      button.style.opacity = '.65';
+      try {
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Unable to submit the request. Please try again or contact the driver.');
+        status.textContent = 'Request received. Your reference is ' + result.reference + '. The driver will contact you to confirm.';
+        form.reset();
+      } catch (err) {
+        status.textContent = err.message || 'Could not submit. Please contact the driver directly.';
+      } finally {
+        button.disabled = false;
+        button.style.opacity = '1';
+      }
+    });
+  </script>
+</body>
+</html>

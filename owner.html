@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#101010">
+<title>Owner Dashboard | Private Driver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#101010;--panel:#191919;--gold:#c8a96b;--line:#38342d;--muted:#b9b3a8;--cream:#f6f3ed}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f7f5f0;font-family:"DM Sans",Arial,sans-serif;line-height:1.5}
+.wrap{width:min(1200px,calc(100% - 32px));margin:auto}.bar{border-bottom:1px solid var(--line);padding:18px 0}.barin{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{font-size:12px;letter-spacing:.18em;font-weight:700}.brand span{color:var(--gold)}h1,h2,h3{font-family:"Playfair Display",Georgia,serif;font-weight:500}h1{font-size:clamp(32px,4vw,46px);margin:26px 0 6px}p{color:var(--muted)}.sub{margin-top:0}.btn{border:1px solid var(--gold);background:var(--gold);color:#17140e;padding:11px 16px;font-weight:700;cursor:pointer;font-size:12px;letter-spacing:.05em}.btn.ghost{background:transparent;color:var(--gold)}.btn.danger{background:#3b2020;border-color:#8f5151;color:#ffdede}.btn:disabled{opacity:.5;cursor:not-allowed}.panel{background:var(--panel);border:1px solid var(--line);padding:24px;margin:20px 0}.login{max-width:460px;margin:55px auto}.field{display:grid;gap:7px;margin:15px 0}label{font-size:11px;text-transform:uppercase;letter-spacing:.08em}input,select{background:#0f0f0f;color:#fff;border:1px solid #4a453b;padding:13px;font:inherit;width:100%}.status{font-size:12px;min-height:20px;color:var(--gold)}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:22px 0}.toolbar select{width:auto;min-width:170px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.stat{border:1px solid var(--line);background:var(--panel);padding:16px}.stat small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em}.stat strong{font-size:28px;color:var(--gold)}.list{display:grid;gap:14px;margin:18px 0}.booking{border:1px solid var(--line);background:var(--panel);padding:20px}.bookinghead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.ref{color:var(--gold);font-size:11px;letter-spacing:.1em}.pill{font-size:10px;text-transform:uppercase;letter-spacing:.1em;padding:5px 8px;border:1px solid var(--line);color:#e5d6b6}.route{font-size:17px;margin:12px 0;font-weight:600}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;color:#d1ccc3;font-size:13px}.details b{display:block;color:#9f988c;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}.notes{font-size:13px;color:#bcb6ab;white-space:pre-wrap}.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:17px}.actions select{width:auto;min-width:150px}.empty{border:1px dashed var(--line);padding:30px;text-align:center;color:var(--muted)}.hidden{display:none!important}.privacy{font-size:11px;color:#8f887c;margin:30px 0}a{color:var(--gold)}@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.details{grid-template-columns:1fr 1fr}.panel{padding:18px}.booking{padding:16px}}@media(max-width:420px){.details{grid-template-columns:1fr}.barin{align-items:flex-start}}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap barin"><div class="brand">PRIVATE <span>DRIVER</span> / OWNER</div><button id="logoutBtn" class="btn ghost hidden" type="button">Sign out</button></div></header>
+<main class="wrap">
+<section id="loginPanel" class="panel login">
+  <div class="ref">OWNER ACCESS</div><h1>Booking dashboard</h1>
+  <p>Sign in to review and manage private ride requests.</p>
+  <form id="loginForm">
+    <div class="field"><label for="password">Owner password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="500"></div>
+    <button class="btn" type="submit">Sign in securely</button>
+    <div id="loginStatus" class="status" role="status" aria-live="polite"></div>
+  </form>
+  <p class="privacy">Owner access only. Do not share this page or your password. Sessions expire after 8 hours.</p>
+</section>
+
+<section id="dashboard" class="hidden">
+  <h1>Ride reservations</h1><p class="sub">Review incoming requests, confirm rides, or update reservation statuses.</p>
+  <div class="stats">
+    <div class="stat"><small>New requests</small><strong id="count-new">0</strong></div>
+    <div class="stat"><small>Confirmed</small><strong id="count-confirmed">0</strong></div>
+    <div class="stat"><small>Completed</small><strong id="count-completed">0</strong></div>
+    <div class="stat"><small>Declined / Cancelled</small><strong id="count-declined">0</strong></div>
+  </div>
+  <div class="toolbar">
+    <label for="filter">Show</label>
+    <select id="filter"><option value="">All bookings</option><option value="new">New requests</option><option value="confirmed">Confirmed</option><option value="contacted">Contacted</option><option value="declined">Declined</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+    <button class="btn ghost" id="refreshBtn" type="button">Refresh</button>
+    <span id="dashStatus" class="status" role="status" aria-live="polite"></span>
+  </div>
+  <div id="bookingList" class="list"></div>
+</section>
+<section id="tipPanel" class="panel hidden">
+  <div class="ref">AFTER TRIP COMPLETION</div>
+  <h2>Optional gratuity</h2>
+  <p>After a ride is completed, you can share this optional tip link with the customer. Tips are voluntary and separate from the ride fare.</p>
+  <div class="field"><label for="tipBooking">Completed booking</label><select id="tipBooking"></select></div>
+  <div class="field"><label for="tipAmount">Tip amount (USD)</label><select id="tipAmount"><option value="5">$5</option><option value="10">$10</option><option value="15">$15</option><option value="20">$20</option><option value="25">$25</option><option value="custom">Custom amount</option></select></div>
+  <div class="field hidden" id="customTipWrap"><label for="customTip">Custom tip amount (USD)</label><input id="customTip" type="number" min="1" max="500" step="0.01" placeholder="Enter amount"></div>
+  <button class="btn" id="makeTipLink" type="button">Create tip request link</button>
+  <div id="tipStatus" class="status" role="status" aria-live="polite"></div>
+  <p class="privacy">A secure payment provider must be configured for live collection. This starter creates a tip request record and link path; it does not charge a card or process a payment by itself.</p>
+</section>
+<p class="privacy">Customer booking information is confidential. Access this dashboard only on a trusted device, sign out when finished, and follow your privacy and record-retention practices.</p>
+</main>
+<script>
+const loginPanel=document.getElementById('loginPanel'), dashboard=document.getElementById('dashboard');
+const loginStatus=document.getElementById('loginStatus'), dashStatus=document.getElementById('dashStatus');
+const list=document.getElementById('bookingList'), logoutBtn=document.getElementById('logoutBtn');
+const statuses=['new','confirmed','declined','contacted','completed','cancelled'];
+const labels={new:'New',confirmed:'Confirmed',declined:'Declined',contacted:'Contacted',completed:'Completed',cancelled:'Cancelled'};
+let allBookings=[];
+
+async function api(url,options={}) {
+  const response=await fetch(url,{credentials:'same-origin',cache:'no-store',...options,
+    headers:{'Content-Type':'application/json',...(options.headers||{})}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.error||'Something went wrong.');
+  return data;
+}
+function showDashboard(show){loginPanel.classList.toggle('hidden',show);dashboard.classList.toggle('hidden',!show);logoutBtn.classList.toggle('hidden',!show);}
+function safeText(value){return String(value??'');}
+function make(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;}
+function card(b){
+  const article=make('article','booking');
+  const head=make('div','bookinghead');
+  const ref=make('div','ref',b.reference+' · '+new Date(b.created_at).toLocaleString());
+  const pill=make('span','pill',labels[b.status]||b.status);
+  head.append(ref,pill);article.append(head);
+  article.append(make('div','route',safeText(b.pickup)+'  →  '+safeText(b.destination)));
+  const details=make('div','details');
+  const cells=[
+    ['Pickup time',safeText(b.pickup_date)+' at '+safeText(b.pickup_time)],
+    ['Customer',safeText(b.name)],
+    ['Contact',safeText(b.phone)+' · '+safeText(b.email)],
+    ['Passengers',safeText(b.passengers)],
+    ['Trip type',safeText(b.trip_type)],
+    ['Last updated',b.updated_at?new Date(b.updated_at).toLocaleString():'Not updated']
+  ];
+  for(const [label,value] of cells){const c=make('div');c.append(make('b','',label),make('div','',value));details.append(c);}
+  article.append(details);
+  if(b.notes) article.append(make('p','notes','Trip notes: '+b.notes));
+  const actions=make('div','actions');
+  const select=make('select');select.setAttribute('aria-label','Update booking status');
+  for(const s of statuses){const opt=make('option','',labels[s]);opt.value=s;select.append(opt);}
+  select.value=b.status;
+  const save=make('button','btn','Save status');save.type='button';
+  save.addEventListener('click',async()=>{
+    save.disabled=true;dashStatus.textContent='Saving status…';
+    try{await api('/api/bookings',{method:'PATCH',body:JSON.stringify({reference:b.reference,status:select.value})});dashStatus.textContent='Booking '+b.reference+' updated.';await loadBookings();}
+    catch(e){dashStatus.textContent=e.message;}
+    finally{save.disabled=false;}
+  });
+  const email=make('a','btn ghost','Email customer');email.href='mailto:'+encodeURIComponent(b.email)+'?subject='+encodeURIComponent('Your private driver ride request '+b.reference);
+  const call=make('a','btn ghost','Call customer');call.href='tel:'+b.phone.replace(/[^\d+]/g,'');
+  actions.append(select,save,email,call);article.append(actions);
+
+  // Optional tip record for completed rides; tip is never required.
+  const tipPanel=make('div','actions');
+  tipPanel.style.borderTop='1px solid var(--line)';
+  tipPanel.style.paddingTop='14px';
+  tipPanel.style.marginTop='14px';
+  const tipLabel=make('label','','Optional tip received ($)');
+  tipLabel.style.maxWidth='170px';
+  const tipInput=make('input');
+  tipInput.type='number';tipInput.min='0';tipInput.max='10000';tipInput.step='0.01';
+  tipInput.placeholder='0.00';tipInput.value=(b.tip_amount===null||b.tip_amount===undefined)?'':Number(b.tip_amount).toFixed(2);
+  tipInput.setAttribute('aria-label','Optional tip amount in dollars');
+  tipInput.style.maxWidth='180px';
+  const tipSave=make('button','btn ghost','Save tip');tipSave.type='button';
+  tipSave.addEventListener('click',async()=>{
+    const amount=tipInput.value.trim()===''?null:Number(tipInput.value);
+    if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>10000)){dashStatus.textContent='Enter a valid optional tip amount, or leave it blank.';return;}
+    tipSave.disabled=true;dashStatus.textContent='Saving tip…';
+    try{await api('/api/bookings',{method:'PATCH',body:JSON.stringify({reference:b.reference,tipAmount:amount})});dashStatus.textContent='Optional tip updated for '+b.reference+'.';await loadBookings();}
+    catch(e){dashStatus.textContent=e.message;}
+    finally{tipSave.disabled=false;}
+  });
+  tipPanel.append(tipLabel,tipInput,tipSave);
+  if(b.status!=='completed'){
+    const tipHint=make('span','','Record a tip only after trip completion (optional).');
+    tipHint.style.cssText='font-size:11px;color:var(--muted);width:100%';
+    tipPanel.append(tipHint);
+  }
+  article.append(tipPanel);
+  return article;
+}
+function updateCounts(bookings){
+  document.getElementById('count-new').textContent=bookings.filter(b=>b.status==='new').length;
+  document.getElementById('count-confirmed').textContent=bookings.filter(b=>b.status==='confirmed').length;
+  document.getElementById('count-completed').textContent=bookings.filter(b=>b.status==='completed').length;
+  document.getElementById('count-declined').textContent=bookings.filter(b=>['declined','cancelled'].includes(b.status)).length;
+}
+async function loadBookings(){
+  dashStatus.textContent='Loading reservations…';list.replaceChildren();
+  try{
+    const data=await api('/api/bookings');
+    allBookings=data.bookings||[];updateCounts(allBookings);
+    const filter=document.getElementById('filter').value;
+    const shown=filter?allBookings.filter(b=>b.status===filter):allBookings;
+    if(!shown.length)list.append(make('div','empty','No bookings to show.'));
+    else shown.forEach(b=>list.append(card(b)));
+    dashStatus.textContent=shown.length+' booking(s) shown. Up to 500 most recent records are loaded.';
+  }catch(e){
+    if(e.message.toLowerCase().includes('sign in')){showDashboard(false);loginStatus.textContent='Your session expired. Please sign in again.';}
+    else dashStatus.textContent=e.message;
+  }
+}
+document.getElementById('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();loginStatus.textContent='Signing in…';
+  try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({password:document.getElementById('password').value})});document.getElementById('password').value='';showDashboard(true);await loadBookings();}
+  catch(err){loginStatus.textContent=err.message;}
+});
+document.getElementById('refreshBtn').addEventListener('click',loadBookings);
+document.getElementById('filter').addEventListener('change',()=>{
+  const filter=document.getElementById('filter').value;
+  const shown=filter?allBookings.filter(b=>b.status===filter):allBookings;
+  list.replaceChildren();
+  if(!shown.length)list.append(make('div','empty','No bookings to show.'));
+  else shown.forEach(b=>list.append(card(b)));
+  dashStatus.textContent=shown.length+' booking(s) shown.';
+});
+logoutBtn.addEventListener('click',async()=>{
+  try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch{}
+  showDashboard(false);loginStatus.textContent='You have signed out.';
+});
+
+document.getElementById('tipAmount').addEventListener('change',e=>{
+  document.getElementById('customTipWrap').classList.toggle('hidden',e.target.value!=='custom');
+});
+function updateTipChoices(bookings){
+  const completed=bookings.filter(b=>b.status==='completed');
+  const panel=document.getElementById('tipPanel');
+  const select=document.getElementById('tipBooking');
+  select.replaceChildren();
+  completed.forEach(b=>{
+    const opt=document.createElement('option');
+    opt.value=b.reference;
+    opt.textContent=b.reference+' — '+b.name+' ('+b.pickup_date+')';
+    select.append(opt);
+  });
+  panel.classList.toggle('hidden',completed.length===0);
+}
+const originalLoadBookings = loadBookings;
+loadBookings = async function(){
+  await originalLoadBookings();
+  updateTipChoices(allBookings);
+};
+document.getElementById('makeTipLink').addEventListener('click',async()=>{
+  const bookingReference=document.getElementById('tipBooking').value;
+  const selected=document.getElementById('tipAmount').value;
+  const custom=document.getElementById('customTip').value;
+  const amount=selected==='custom'?Number(custom):Number(selected);
+  const status=document.getElementById('tipStatus');
+  if(!bookingReference){status.textContent='Select a completed ride first.';return;}
+  if(!Number.isFinite(amount)||amount<1||amount>500){status.textContent='Enter a tip between $1 and $500.';return;}
+  status.textContent='Creating optional tip request…';
+  try{
+    const result=await api('/api/tips',{method:'POST',body:JSON.stringify({bookingReference,amount})});
+    const fullUrl=location.origin+result.tipPath;
+    await navigator.clipboard.writeText(fullUrl).catch(()=>{});
+    status.textContent='Tip request link created: '+fullUrl+' (copied if clipboard access is available). Payment provider setup is still required for collection.';
+  }catch(e){status.textContent=e.message;}
+});
+
+</script>
+</body></html>

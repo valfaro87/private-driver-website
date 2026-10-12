@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#101010">
+<title>Optional Tip | Private Driver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#101010;color:#f7f5f0;font-family:"DM Sans",Arial,sans-serif;display:grid;place-items:center;padding:22px}.card{width:min(520px,100%);border:1px solid #51452e;background:#191919;padding:32px}.eyebrow{color:#c8a96b;font-size:11px;letter-spacing:.2em;text-transform:uppercase}h1{font:500 38px/1.15 "Playfair Display",Georgia,serif;margin:14px 0}p{color:#bdb8ae;line-height:1.6}.amount{font-size:34px;color:#c8a96b;font-weight:700;margin:24px 0}.notice{background:#242119;border-left:3px solid #c8a96b;padding:14px;font-size:13px;color:#d8d0c1}.btn{display:inline-block;border:1px solid #c8a96b;background:#c8a96b;color:#17140e;padding:12px 16px;text-decoration:none;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:18px}.muted{font-size:11px;color:#8f887c}
+</style></head><body>
+<main class="card">
+<div class="eyebrow">A small thank-you, if you wish</div>
+<h1>Leave an optional tip</h1>
+<p>Gratuities are entirely voluntary and are not required to complete or receive a ride. Thank you for choosing a private driver service.</p>
+<div id="amount" class="amount">Tip request</div>
+<div id="notice" class="notice">This tip request is not yet connected to a payment processor. Please contact the driver directly to arrange a tip using an agreed payment method.</div>
+<a class="btn" id="contact" href="/">Return to website</a>
+<p class="muted">No card information is collected on this page. Do not send payment details through a contact form or email.</p>
+</main>
+<script>
+(async()=>{
+ const ref=new URLSearchParams(location.search).get('ref');
+ if(!ref){document.getElementById('amount').textContent='Optional gratuity';return;}
+ // Tip records are not publicly queryable. Avoid exposing booking/customer details.
+ document.getElementById('amount').textContent='Thank you for your generosity';
+})();
+</script></body></html>
