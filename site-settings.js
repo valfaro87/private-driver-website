@@ -4,9 +4,9 @@
   Public contact details will be visible to website visitors.
 */
 window.SITE_SETTINGS = {
-  businessName: "Your Business Name",
+  businessName: "MVBRI",
   phone: "",                  // Example: "+1 713 555 0100"
-  phoneDisplay: "(Add your business phone)",
-  email: "replace@example.com",
+  phoneDisplay: "(346)557-5796",
+  email: "mvbriofficial@gmail.com",
   serviceArea: "Houston, Texas and surrounding areas"
 };
