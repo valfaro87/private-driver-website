@@ -1,4 +1,4 @@
-import { json, ownerSession, sameOrigin } from "../../_lib/auth.js";
+import { json, ownerSession, sameOrigin } from "../_lib/auth.js";
 
 const clean = (v, max = 80) => String(v ?? "").trim().slice(0, max);
 
