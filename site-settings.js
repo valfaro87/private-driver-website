@@ -5,8 +5,8 @@
 */
 window.SITE_SETTINGS = {
   businessName: "MVBRI",
-  phone: "",                  // Example: "+1 713 555 0100"
-  phoneDisplay: "(346)557-5796",
+  phone: "+1 3465575796",
+  phoneDisplay: "(346) 557-5796",
   email: "mvbriofficial@gmail.com",
   serviceArea: "Houston, Texas and surrounding areas"
 };
