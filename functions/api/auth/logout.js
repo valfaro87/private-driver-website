@@ -1,4 +1,4 @@
-import { clearSessionCookie, cookieValue, json, sameOrigin, sha256Hex } from "../../../_lib/auth.js";
+import { clearSessionCookie, cookieValue, json, sameOrigin, sha256Hex } from "../../_lib/auth.js";
 
 export async function onRequestPost({ request, env }) {
   if (!sameOrigin(request)) return json({ error: "Request rejected." }, 403);
