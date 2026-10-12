@@ -1,4 +1,4 @@
-import { clearSessionCookie, json, sameOrigin, sessionCookie, sha256Hex } from "../../../_lib/auth.js";
+import { clearSessionCookie, json, sameOrigin, sessionCookie, sha256Hex } from "../../_lib/auth.js";
 
 export async function onRequestPost({ request, env }) {
   if (!env.DB || !env.OWNER_PASSWORD) {
