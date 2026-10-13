@@ -89,6 +89,55 @@
   <button class="btn" id="savePricingBtn" type="button">Save pricing settings</button>
   <div id="pricingStatus" class="status" role="status" aria-live="polite"></div>
 </section>
+  
+<section id="quotesPanel" class="panel hidden">
+  <div class="ref">OWNER TOOLS</div>
+  <h2>Create a ride quote</h2>
+  <p>Select a booking, calculate the fare, and save a draft for your review. No customer link is sent at this stage.</p>
+
+  <div class="field">
+    <label for="quoteBooking">Booking</label>
+    <select id="quoteBooking" required>
+      <option value="">Loading bookings…</option>
+    </select>
+  </div>
+
+  <div id="quoteBookingDetails" class="status" aria-live="polite"></div>
+
+  <div class="field">
+    <label for="quoteMileage">Trip mileage</label>
+    <input id="quoteMileage" type="number" min="0" max="10000" step="0.1" value="10" required>
+  </div>
+
+  <div class="field">
+    <label>
+      <input id="quoteWeekend" type="checkbox">
+      Apply weekend adjustment
+    </label>
+  </div>
+
+  <div class="field">
+    <label>
+      <input id="quoteLateNight" type="checkbox">
+      Apply late-night / early-morning adjustment
+    </label>
+  </div>
+
+  <div class="field">
+    <label for="quoteManualAdjustment">Manual adjustment (USD; negative values allowed)</label>
+    <input id="quoteManualAdjustment" type="number" min="-100000" max="100000" step="0.01" value="0" required>
+  </div>
+
+  <div class="field">
+    <label for="quoteOwnerNotes">Private owner notes (not shown to customer)</label>
+    <textarea id="quoteOwnerNotes" maxlength="1500" rows="3"></textarea>
+  </div>
+
+  <button class="btn" id="calculateQuoteBtn" type="button">Calculate and save draft</button>
+
+  <div id="quoteStatus" class="status" role="status" aria-live="polite"></div>
+  <div id="quotePreview" class="panel hidden" aria-live="polite"></div>
+</section>
 <p class="privacy">Customer booking information is confidential. Access this dashboard only on a trusted device, sign out when finished, and follow your privacy and record-retention practices.</p>
 </main>
 <script>
@@ -111,9 +160,11 @@ function showDashboard(show){
   dashboard.classList.toggle('hidden', !show);
   logoutBtn.classList.toggle('hidden', !show);
   pricingPanel.classList.toggle('hidden', !show);
+  quotesPanel.classList.toggle('hidden', !show);
 
   if (show) {
     loadPricingSettings();
+    loadQuoteBookings();
   }
 }
 function safeText(value){return String(value??'');}
@@ -318,6 +369,141 @@ document.getElementById('savePricingBtn').addEventListener('click', async () => 
     pricingStatus.textContent = result.message || 'Pricing settings saved.';
   } catch (error) {
     pricingStatus.textContent = error.message;
+  }
+});
+
+const quotesPanel = document.getElementById('quotesPanel');
+const quoteBookingSelect = document.getElementById('quoteBooking');
+const quoteStatus = document.getElementById('quoteStatus');
+const quotePreview = document.getElementById('quotePreview');
+
+async function loadQuoteBookings() {
+  quoteBookingSelect.replaceChildren();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Loading bookings…';
+  quoteBookingSelect.append(placeholder);
+
+  try {
+    const result = await api('/api/quotes');
+    quoteBookingSelect.replaceChildren();
+
+    const bookings = result.bookings || [];
+    if (!bookings.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No bookings found';
+      quoteBookingSelect.append(option);
+      return;
+    }
+
+    const prompt = document.createElement('option');
+    prompt.value = '';
+    prompt.textContent = 'Select a booking';
+    quoteBookingSelect.append(prompt);
+
+    const seen = new Set();
+    for (const booking of bookings) {
+      if (!booking.booking_reference || seen.has(booking.booking_reference)) continue;
+      seen.add(booking.booking_reference);
+
+      const option = document.createElement('option');
+      option.value = booking.booking_reference;
+      option.textContent =
+        booking.booking_reference + ' — ' +
+        booking.name + ' — ' +
+        booking.pickup_date + ' — ' +
+        booking.pickup + ' to ' + booking.destination;
+
+      quoteBookingSelect.append(option);
+    }
+
+    quoteStatus.textContent = 'Bookings loaded.';
+  } catch (error) {
+    quoteBookingSelect.replaceChildren();
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Could not load bookings';
+    quoteBookingSelect.append(option);
+    quoteStatus.textContent = error.message;
+  }
+}
+
+document.getElementById('quoteBooking').addEventListener('change', () => {
+  const selected = quoteBookingSelect.selectedOptions[0];
+  document.getElementById('quoteBookingDetails').textContent =
+    selected && selected.value ? selected.textContent : '';
+});
+
+document.getElementById('calculateQuoteBtn').addEventListener('click', async () => {
+  quoteStatus.textContent = 'Calculating draft…';
+  quotePreview.classList.add('hidden');
+  quotePreview.replaceChildren();
+
+  const bookingReference = quoteBookingSelect.value;
+  const mileage = Number(document.getElementById('quoteMileage').value);
+  const manualAdjustment = Number(
+    document.getElementById('quoteManualAdjustment').value
+  );
+  const weekend = document.getElementById('quoteWeekend').checked;
+  const lateNight = document.getElementById('quoteLateNight').checked;
+  const ownerNotes = document.getElementById('quoteOwnerNotes').value;
+
+  if (!bookingReference) {
+    quoteStatus.textContent = 'Please select a booking.';
+    return;
+  }
+  if (!Number.isFinite(mileage) || mileage < 0 || mileage > 10000) {
+    quoteStatus.textContent = 'Enter mileage between 0 and 10,000.';
+    return;
+  }
+  if (!Number.isFinite(manualAdjustment) ||
+      manualAdjustment < -100000 || manualAdjustment > 100000) {
+    quoteStatus.textContent = 'Enter a valid manual adjustment.';
+    return;
+  }
+
+  try {
+    const result = await api('/api/quotes', {
+      method: 'POST',
+      body: JSON.stringify({
+        bookingReference,
+        mileage,
+        manualAdjustment,
+        weekend,
+        lateNight,
+        ownerNotes
+      })
+    });
+
+    const quote = result.quote;
+    const heading = document.createElement('h3');
+    heading.textContent = 'Draft quote saved';
+    quotePreview.append(heading);
+
+    const rows = [
+      ['Quote reference', quote.reference],
+      ['Booking reference', quote.bookingReference],
+      ['Base fare (minimum or mileage fare)', '$' + quote.baseFare.toFixed(2)],
+      ['Mileage fare before minimum', '$' + quote.mileageFare.toFixed(2)],
+      ['Weekend adjustment', '$' + quote.weekendAdjustment.toFixed(2)],
+      ['Late-night adjustment', '$' + quote.lateNightAdjustment.toFixed(2)],
+      ['Manual adjustment', '$' + quote.manualAdjustment.toFixed(2)],
+      ['Proposed total', '$' + quote.finalFare.toFixed(2)],
+      ['Status', 'Draft — not sent to customer']
+    ];
+
+    for (const [label, value] of rows) {
+      const line = document.createElement('p');
+      line.textContent = label + ': ' + value;
+      quotePreview.append(line);
+    }
+
+    quotePreview.classList.remove('hidden');
+    quoteStatus.textContent =
+      'Draft saved. Review the amount before issuing a quote.';
+  } catch (error) {
+    quoteStatus.textContent = error.message;
   }
 });
 </script>
