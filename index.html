@@ -86,6 +86,7 @@
     @media(max-width:800px){.hero-grid,.booking-grid,.contact{grid-template-columns:1fr}.hero-grid{padding:65px 0;gap:30px}.hero-card{min-height:240px}.services{grid-template-columns:1fr}.payment-grid{grid-template-columns:repeat(2,1fr)}.navlinks{gap:12px}.navlinks a:not(.btn){display:none}}
     @media(max-width:500px){.wrap{width:min(100% - 28px,1120px)}section{padding:58px 0}form{grid-template-columns:1fr}.field.full,.form-note,.form-submit{grid-column:1}.nav .btn{padding:10px 12px;font-size:10px}.hero-actions .btn{width:100%}}
   </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
   <div class="topbar">
@@ -166,6 +167,15 @@
             <div class="field"><label for="passengers">Passengers *</label><select id="passengers" name="passengers" required><option value="">Select</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option></select></div>
             <div class="field"><label for="trip">Trip type *</label><select id="trip" name="trip" required><option value="">Select</option><option>One-way</option><option>Round trip</option><option>Multiple stops</option></select></div>
             <div class="field full"><label for="notes">Additional details (optional)</label><textarea id="notes" name="notes" placeholder="Return pickup details, flight number, luggage, or other trip notes"></textarea></div>
+            
+<div class="field full">
+  <div
+    class="cf-turnstile"
+    data-sitekey="0x4AAAAAAFV68lQ3uIshr5hF"
+    data-theme="dark">
+  </div>
+</div>
+
             <div class="form-note">Your request will be saved to the business booking database. The driver will contact you to confirm availability and pricing. Please do not include payment card numbers or sensitive personal information.</div>
             <div class="form-submit"><button class="btn" type="submit">Prepare ride request</button><span id="formStatus" role="status" aria-live="polite" style="font-size:12px"></span></div>
           </form>
