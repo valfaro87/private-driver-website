@@ -43,10 +43,42 @@ export async function onRequestPost({ request, env }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(booking.email)) {
     return json({ error: "Please enter a valid email address." }, 400);
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(booking.date) ||
-      !/^\d{2}:\d{2}$/.test(booking.time)) {
-    return json({ error: "Please enter a valid pickup date and time." }, 400);
+ 
+  // Validate actual calendar dates and 24-hour pickup times.
+  const dateParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(booking.date);
+  const timeParts = /^(\d{2}):(\d{2})$/.exec(booking.time);
+
+  if (!dateParts || !timeParts) {
+    return json({
+      error: "Please enter a valid pickup date and time."
+    }, 400);
   }
+
+  const year = Number(dateParts[1]);
+  const month = Number(dateParts[2]);
+  const day = Number(dateParts[3]);
+  const hour = Number(timeParts[1]);
+  const minute = Number(timeParts[2]);
+
+  const validCalendarDate =
+    year >= 2026 &&
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const validTime =
+    hour >= 0 &&
+    hour <= 23 &&
+    minute >= 0 &&
+    minute <= 59;
+
+  if (!validCalendarDate || !validTime) {
+    return json({
+      error: "Please enter a valid pickup date and time."
+    }, 400);
+  }
+
   if (!["1", "2", "3", "4", "5", "6+"].includes(booking.passengers)) {
     return json({ error: "Please select a valid passenger count." }, 400);
   }
