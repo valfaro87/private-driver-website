@@ -106,6 +106,29 @@ export async function onRequestPost({ request, env }) {
     }, 400);
   }
 
+  // Reject pickup times that have already passed today in Houston.
+  const houstonTimeParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date());
+
+  const getTimePart = type =>
+    houstonTimeParts.find(part => part.type === type)?.value;
+
+  const currentHoustonTime =
+    `${getTimePart("hour")}:${getTimePart("minute")}`;
+
+  if (
+    booking.date === todayKey &&
+    booking.time <= currentHoustonTime
+  ) {
+    return json({
+      error: "Please choose a pickup time later than the current Houston time."
+    }, 400);
+  }
+
   if (!["1", "2", "3", "4", "5", "6+"].includes(booking.passengers)) {
     return json({ error: "Please select a valid passenger count." }, 400);
   }
