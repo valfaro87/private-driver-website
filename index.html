@@ -257,9 +257,27 @@
       const form = this;
       const status = document.getElementById('formStatus');
       const button = form.querySelector('button[type="submit"]');
-      const d = new FormData(form);
-      const payload = Object.fromEntries(d.entries());
-      status.textContent = 'Submitting your ride request securely…';
+     
+const d = new FormData(form);
+const payload = Object.fromEntries(d.entries());
+
+// Get the Cloudflare Turnstile verification token.
+const turnstileToken = d.get('cf-turnstile-response');
+
+if (!turnstileToken) {
+  status.textContent =
+    'Please complete the security verification before submitting.';
+  return;
+}
+
+// Include the token in the booking API request.
+payload.turnstileToken = turnstileToken;
+
+// Do not send the duplicate form field.
+delete payload['cf-turnstile-response'];
+
+status.textContent = 'Submitting your ride request securely…';
+
       button.disabled = true;
       button.style.opacity = '.65';
       try {
@@ -274,10 +292,20 @@
         form.reset();
       } catch (err) {
         status.textContent = err.message || 'Could not submit. Please contact the driver directly.';
-      } finally {
-        button.disabled = false;
-        button.style.opacity = '1';
-      }
+     
+} finally {
+  if (window.turnstile) {
+    try {
+      window.turnstile.reset();
+    } catch (error) {
+      console.warn('Turnstile reset unavailable:', error);
+    }
+  }
+
+  button.disabled = false;
+  button.style.opacity = '1';
+}
+
     });
   </script>
 </body>
