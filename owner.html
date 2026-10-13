@@ -106,7 +106,16 @@ async function api(url,options={}) {
   if(!response.ok) throw new Error(data.error||'Something went wrong.');
   return data;
 }
-function showDashboard(show){loginPanel.classList.toggle('hidden',show);dashboard.classList.toggle('hidden',!show);logoutBtn.classList.toggle('hidden',!show);}
+function showDashboard(show){
+  loginPanel.classList.toggle('hidden', show);
+  dashboard.classList.toggle('hidden', !show);
+  logoutBtn.classList.toggle('hidden', !show);
+  pricingPanel.classList.toggle('hidden', !show);
+
+  if (show) {
+    loadPricingSettings();
+  }
+}
 function safeText(value){return String(value??'');}
 function make(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;}
 function card(b){
@@ -251,5 +260,65 @@ document.getElementById('makeTipLink').addEventListener('click',async()=>{
   }catch(e){status.textContent=e.message;}
 });
 
+const pricingPanel = document.getElementById('pricingPanel');
+const pricingStatus = document.getElementById('pricingStatus');
+
+async function loadPricingSettings() {
+  pricingStatus.textContent = 'Loading pricing settings…';
+
+  try {
+    const settings = await api('/api/pricing');
+
+    document.getElementById('minimumFare').value = settings.minimumFare;
+    document.getElementById('pricePerMile').value = settings.pricePerMile;
+    document.getElementById('weekendAdjustment').value = settings.weekendAdjustment;
+    document.getElementById('lateNightAdjustment').value = settings.lateNightAdjustment;
+    document.getElementById('expirationHours').value = settings.expirationHours;
+
+    pricingStatus.textContent = 'Pricing settings loaded.';
+  } catch (error) {
+    pricingStatus.textContent = error.message;
+  }
+}
+
+document.getElementById('savePricingBtn').addEventListener('click', async () => {
+  pricingStatus.textContent = 'Saving pricing settings…';
+
+  const settings = {
+    minimumFare: Number(document.getElementById('minimumFare').value),
+    pricePerMile: Number(document.getElementById('pricePerMile').value),
+    weekendAdjustment: Number(document.getElementById('weekendAdjustment').value),
+    lateNightAdjustment: Number(document.getElementById('lateNightAdjustment').value),
+    expirationHours: Number(document.getElementById('expirationHours').value)
+  };
+
+  if (
+    !Number.isFinite(settings.minimumFare) ||
+    !Number.isFinite(settings.pricePerMile) ||
+    !Number.isFinite(settings.weekendAdjustment) ||
+    !Number.isFinite(settings.lateNightAdjustment) ||
+    settings.minimumFare < 0 ||
+    settings.pricePerMile < 0 ||
+    settings.weekendAdjustment < 0 ||
+    settings.lateNightAdjustment < 0 ||
+    !Number.isInteger(settings.expirationHours) ||
+    settings.expirationHours < 1 ||
+    settings.expirationHours > 168
+  ) {
+    pricingStatus.textContent = 'Please enter valid pricing values. Expiration must be 1–168 whole hours.';
+    return;
+  }
+
+  try {
+    const result = await api('/api/pricing', {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
+
+    pricingStatus.textContent = result.message || 'Pricing settings saved.';
+  } catch (error) {
+    pricingStatus.textContent = error.message;
+  }
+});
 </script>
 </body></html>
