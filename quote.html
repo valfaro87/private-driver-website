@@ -1,0 +1,378 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Your Ride Quote | MVBRI</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #14263d;
+      --gold: #c6a15b;
+      --muted: #667085;
+      --border: #e4e7ec;
+      --background: #f5f7fa;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.6;
+    }
+
+    header {
+      background: var(--navy);
+      color: white;
+      padding: 24px 18px;
+      text-align: center;
+    }
+
+    .brand {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 3px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: #e0e6ef;
+      font-size: 14px;
+    }
+
+    main {
+      width: min(100% - 32px, 620px);
+      margin: 36px auto;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 8px 30px rgba(20, 38, 61, 0.06);
+    }
+
+    .eyebrow {
+      color: #8a6a2f;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+    }
+
+    h1 { margin: 8px 0; font-size: 27px; }
+
+    .muted { color: var(--muted); }
+
+    .fare {
+      background: #f8f5ee;
+      border: 1px solid #eee2c8;
+      border-radius: 12px;
+      padding: 22px;
+      margin: 24px 0;
+      text-align: center;
+    }
+
+    .fare-label { color: var(--muted); font-size: 14px; }
+
+    #fareAmount {
+      font-size: 38px;
+      font-weight: bold;
+      margin: 4px 0;
+    }
+
+    .detail {
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .detail:last-child { border-bottom: 0; }
+
+    .detail-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .detail-value {
+      overflow-wrap: anywhere;
+      font-weight: 600;
+    }
+
+    .status {
+      margin: 18px 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: #f2f4f7;
+      color: var(--navy);
+      overflow-wrap: anywhere;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      flex: 1;
+      border: 0;
+      border-radius: 8px;
+      padding: 14px 12px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #acceptBtn { background: var(--navy); color: white; }
+
+    #declineBtn {
+      background: white;
+      color: var(--navy);
+      border: 1px solid var(--border);
+    }
+
+    .notice { font-size: 13px; color: var(--muted); }
+
+    footer {
+      text-align: center;
+      padding: 10px 20px 30px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 460px) {
+      .card { padding: 21px; }
+      .actions { flex-direction: column; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 class="brand">MVBRI</h2>
+    <p>Private Driver Service · Houston, Texas</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="eyebrow">PERSONALIZED RIDE QUOTE</div>
+      <h1>Your ride proposal</h1>
+      <p class="muted">
+        Please review your trip details and proposed fare below.
+      </p>
+
+      <div class="fare">
+        <div class="fare-label">Proposed total fare</div>
+        <div id="fareAmount">—</div>
+        <div class="fare-label">USD</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Quote reference</div>
+        <div class="detail-value" id="quoteReference">Loading…</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Booking reference</div>
+        <div class="detail-value" id="bookingReference">—</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Pickup</div>
+        <div class="detail-value" id="pickup">—</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Destination</div>
+        <div class="detail-value" id="destination">—</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Pickup date and time</div>
+        <div class="detail-value" id="pickupDateTime">—</div>
+      </div>
+
+      <div class="detail">
+        <div class="detail-label">Quote expires</div>
+        <div class="detail-value" id="expiresAt">—</div>
+      </div>
+
+      <div id="statusMessage" class="status" role="status"
+           aria-live="polite">
+        Loading your quote…
+      </div>
+
+      <div id="actions" class="actions" hidden>
+        <button id="acceptBtn" type="button">Accept Quote</button>
+        <button id="declineBtn" type="button">Decline Quote</button>
+      </div>
+
+      <p class="notice">
+        Accepting a quote records your response; it does not collect payment.
+        Please contact MVBRI if you have questions about your trip.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    MVBRI · Houston, Texas · (346) 557-5796
+  </footer>
+
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+    const statusMessage = document.getElementById('statusMessage');
+    const actions = document.getElementById('actions');
+    const acceptBtn = document.getElementById('acceptBtn');
+    const declineBtn = document.getElementById('declineBtn');
+
+    let currentStatus = '';
+
+    function showStatus(message) {
+      statusMessage.textContent = message;
+    }
+
+    function formatDate(value) {
+      if (!value) return 'Not provided';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? 'Not provided'
+        : date.toLocaleString([], {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          });
+    }
+
+    async function loadQuote() {
+      if (!token || token.length > 200) {
+        showStatus('This quote link is missing or invalid. Please contact MVBRI.');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          '/api/quotes/customer?token=' + encodeURIComponent(token),
+          { cache: 'no-store', credentials: 'same-origin' }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showStatus(data.error || 'We could not load this quote.');
+          return;
+        }
+
+        const quote = data.quote;
+        if (!quote) {
+          showStatus('Quote details are unavailable. Please contact MVBRI.');
+          return;
+        }
+
+        document.getElementById('fareAmount').textContent =
+          new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+          }).format(quote.finalFare);
+
+        document.getElementById('quoteReference').textContent =
+          quote.reference || '—';
+        document.getElementById('bookingReference').textContent =
+          quote.bookingReference || '—';
+        document.getElementById('pickup').textContent =
+          quote.pickup || 'Not provided';
+        document.getElementById('destination').textContent =
+          quote.destination || 'Not provided';
+
+        const pickupTime = quote.pickupTime || '';
+        document.getElementById('pickupDateTime').textContent =
+          [quote.pickupDate, pickupTime].filter(Boolean).join(' ') ||
+          'Not provided';
+
+        document.getElementById('expiresAt').textContent =
+          formatDate(quote.expiresAt);
+
+        currentStatus = quote.status;
+
+        if (quote.status === 'issued') {
+          showStatus('Please review the details before responding.');
+          actions.hidden = false;
+        } else if (quote.status === 'accepted') {
+          showStatus('This quote has already been accepted.');
+        } else if (quote.status === 'declined') {
+          showStatus('This quote has been declined.');
+        } else if (quote.status === 'expired') {
+          showStatus('This quote has expired. Please contact MVBRI for an updated quote.');
+        } else if (quote.status === 'cancelled' ||
+                   quote.status === 'superseded') {
+          showStatus('This quote is no longer active. Please contact MVBRI.');
+        } else {
+          showStatus('This quote is not available for a customer response.');
+        }
+      } catch {
+        showStatus('Unable to load your quote right now. Please try again later.');
+      }
+    }
+
+    async function respond(action) {
+      if (currentStatus !== 'issued') {
+        showStatus('This quote is no longer available for a response.');
+        actions.hidden = true;
+        return;
+      }
+
+      const confirmation = action === 'accept'
+        ? 'Do you want to accept this ride quote?'
+        : 'Do you want to decline this ride quote?';
+
+      if (!confirm(confirmation)) return;
+
+      acceptBtn.disabled = true;
+      declineBtn.disabled = true;
+      showStatus('Submitting your response…');
+
+      try {
+        const response = await fetch('/api/quotes/customer', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, action })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showStatus(data.error || 'Your response could not be recorded.');
+          await loadQuote();
+          return;
+        }
+
+        currentStatus = data.quote?.status || action;
+        actions.hidden = true;
+        showStatus(
+          action === 'accept'
+            ? 'Thank you. Your quote acceptance has been recorded. Please contact MVBRI to confirm the ride arrangements.'
+            : 'Your decision to decline this quote has been recorded.'
+        );
+      } catch {
+        showStatus('We could not submit your response. Please try again.');
+      } finally {
+        acceptBtn.disabled = false;
+        declineBtn.disabled = false;
+      }
+    }
+
+    acceptBtn.addEventListener('click', () => respond('accept'));
+    declineBtn.addEventListener('click', () => respond('decline'));
+
+    loadQuote();
+  </script>
+</body>
+</html>
