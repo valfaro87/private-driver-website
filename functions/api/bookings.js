@@ -22,6 +22,47 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Invalid request. Please check your details and try again." }, 400);
   }
 
+  // Reject oversized booking fields before they are truncated.
+  const fieldLimits = {
+    name: 120,
+    phone: 40,
+    email: 254,
+    pickup: 500,
+    destination: 500,
+    date: 10,
+    time: 5,
+    passengers: 10,
+    trip: 40,
+    notes: 1500
+  };
+
+  // Require a JSON object rather than null or an array.
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body)
+  ) {
+    return json({ error: "Invalid booking details." }, 400);
+  }
+
+  for (const [field, maxLength] of Object.entries(fieldLimits)) {
+    const value = body[field];
+
+    if (value !== undefined && value !== null) {
+      if (typeof value !== "string") {
+        return json({
+          error: `Invalid value for ${field}.`
+        }, 400);
+      }
+
+      if (value.trim().replace(/\u0000/g, "").length > maxLength) {
+        return json({
+          error: `${field} is too long. Maximum ${maxLength} characters.`
+        }, 400);
+      }
+    }
+  }
+
   const booking = {
     name: clean(body.name, 120),
     phone: clean(body.phone, 40),
