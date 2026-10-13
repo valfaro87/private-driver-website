@@ -500,6 +500,60 @@ document.getElementById('calculateQuoteBtn').addEventListener('click', async () 
     }
 
     quotePreview.classList.remove('hidden');
+    
+const issueButton = document.createElement('button');
+issueButton.type = 'button';
+issueButton.className = 'btn';
+issueButton.textContent = 'Issue Quote';
+
+issueButton.addEventListener('click', async () => {
+  if (!confirm('Issue this quote and create a customer link?')) return;
+
+  issueButton.disabled = true;
+  quoteStatus.textContent = 'Issuing quote…';
+
+  try {
+    const issued = await api('/api/quotes/issue', {
+      method: 'POST',
+      body: JSON.stringify({ reference: quote.reference })
+    });
+
+    const linkLabel = document.createElement('p');
+    linkLabel.textContent = 'Customer quote link:';
+
+    const linkInput = document.createElement('input');
+    linkInput.type = 'url';
+    linkInput.readOnly = true;
+    linkInput.value = issued.quote.customerUrl;
+    linkInput.style.width = '100%';
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'btn';
+    copyButton.textContent = 'Copy customer link';
+
+    copyButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(linkInput.value);
+        quoteStatus.textContent = 'Customer link copied.';
+      } catch {
+        linkInput.focus();
+        linkInput.select();
+        quoteStatus.textContent =
+          'Select and copy the link manually using Ctrl+C.';
+      }
+    });
+
+    quotePreview.append(linkLabel, linkInput, copyButton);
+    quoteStatus.textContent =
+      'Quote issued. The customer page is not ready yet, so do not send this link.';
+  } catch (error) {
+    quoteStatus.textContent = error.message;
+    issueButton.disabled = false;
+  }
+});
+
+quotePreview.append(issueButton);
     quoteStatus.textContent =
       'Draft saved. Review the amount before issuing a quote.';
   } catch (error) {
