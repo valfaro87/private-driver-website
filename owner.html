@@ -54,6 +54,40 @@
   <button class="btn" id="makeTipLink" type="button">Create tip request link</button>
   <div id="tipStatus" class="status" role="status" aria-live="polite"></div>
   <p class="privacy">A secure payment provider must be configured for live collection. This starter creates a tip request record and link path; it does not charge a card or process a payment by itself.</p>
+</section> 
+  
+<section id="pricingPanel" class="panel hidden">
+  <div class="ref">OWNER SETTINGS</div>
+  <h2>Ride pricing</h2>
+  <p>Set your standard rates. Review each ride quote before sending it to a customer.</p>
+
+  <div class="field">
+    <label for="minimumFare">Minimum fare (USD)</label>
+    <input id="minimumFare" type="number" min="0" max="100000" step="0.01" value="50" required>
+  </div>
+
+  <div class="field">
+    <label for="pricePerMile">Price per mile (USD)</label>
+    <input id="pricePerMile" type="number" min="0" max="10000" step="0.01" value="2.50" required>
+  </div>
+
+  <div class="field">
+    <label for="weekendAdjustment">Weekend adjustment (USD)</label>
+    <input id="weekendAdjustment" type="number" min="0" max="10000" step="0.01" value="10" required>
+  </div>
+
+  <div class="field">
+    <label for="lateNightAdjustment">Late-night / early-morning adjustment (USD)</label>
+    <input id="lateNightAdjustment" type="number" min="0" max="10000" step="0.01" value="10" required>
+  </div>
+
+  <div class="field">
+    <label for="expirationHours">Quote expiration (hours)</label>
+    <input id="expirationHours" type="number" min="1" max="168" step="1" value="24" required>
+  </div>
+
+  <button class="btn" id="savePricingBtn" type="button">Save pricing settings</button>
+  <div id="pricingStatus" class="status" role="status" aria-live="polite"></div>
 </section>
 <p class="privacy">Customer booking information is confidential. Access this dashboard only on a trusted device, sign out when finished, and follow your privacy and record-retention practices.</p>
 </main>
