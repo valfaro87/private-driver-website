@@ -306,13 +306,17 @@
           actions.hidden = false;
         } else if (quote.status === 'accepted') {
           showStatus('This quote has already been accepted.');
+          actions.hidden = true;
         } else if (quote.status === 'declined') {
           showStatus('This quote has been declined.');
+          actions.hidden = true;
         } else if (quote.status === 'expired') {
           showStatus('This quote has expired. Please contact MVBRI for an updated quote.');
+          actions.hidden = true;
         } else if (quote.status === 'cancelled' ||
                    quote.status === 'superseded') {
           showStatus('This quote is no longer active. Please contact MVBRI.');
+          actions.hidden = true;
         } else {
           showStatus('This quote is not available for a customer response.');
         }
