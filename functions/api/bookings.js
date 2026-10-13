@@ -13,14 +13,62 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Please submit the form using the website." }, 415);
   }
 
-  let body;
-  try {
-    const length = Number(request.headers.get("content-length") || 0);
-    if (length > 12000) return json({ error: "Request is too large." }, 413);
-    body = await request.json();
-  } catch {
-    return json({ error: "Invalid request. Please check your details and try again." }, 400);
+  
+let body;
+try {
+  const maxBytes = 12000;
+
+  const declaredLength = request.headers.get("content-length");
+
+  if (
+    declaredLength !== null &&
+    Number(declaredLength) > maxBytes
+  ) {
+    return json({ error: "Request is too large." }, 413);
   }
+
+  const reader = request.body?.getReader();
+
+  if (!reader) {
+    return json({ error: "Invalid request body." }, 400);
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    totalBytes += value.byteLength;
+
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      return json({ error: "Request is too large." }, 413);
+    }
+
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const rawText = new TextDecoder("utf-8", {
+    fatal: true
+  }).decode(bytes);
+
+  body = JSON.parse(rawText);
+} catch {
+  return json({
+    error: "Invalid request. Please check your details and try again."
+  }, 400);
+}
+
 
   // Reject oversized booking fields before they are truncated.
   const fieldLimits = {
