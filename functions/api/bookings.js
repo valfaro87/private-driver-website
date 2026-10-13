@@ -79,6 +79,33 @@ export async function onRequestPost({ request, env }) {
     }, 400);
   }
 
+  // Compare the requested pickup date with today's date in Houston.
+  const houstonToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+
+  const todayParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const getPart = type =>
+    todayParts.find(part => part.type === type)?.value;
+
+  const todayKey =
+    `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+
+  if (booking.date < todayKey) {
+    return json({
+      error: "Please choose a pickup date that is today or later."
+    }, 400);
+  }
+
   if (!["1", "2", "3", "4", "5", "6+"].includes(booking.passengers)) {
     return json({ error: "Please select a valid passenger count." }, 400);
   }
