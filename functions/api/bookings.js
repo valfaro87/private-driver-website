@@ -225,6 +225,66 @@ try {
     return json({ error: "Please select a valid trip type." }, 400);
   }
 
+  // Verify Cloudflare Turnstile before saving the booking.
+  const turnstileToken = body.turnstileToken;
+
+  if (
+    typeof turnstileToken !== "string" ||
+    !turnstileToken ||
+    turnstileToken.length > 2048
+  ) {
+    return json({
+      error: "Please complete the security verification."
+    }, 403);
+  }
+
+  if (!env.TURNSTILE_SECRET_KEY) {
+    console.error("Turnstile secret is not configured.");
+    return json({
+      error: "Booking verification is temporarily unavailable."
+    }, 503);
+  }
+
+  let verification;
+
+  try {
+    const verificationResponse = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          secret: env.TURNSTILE_SECRET_KEY,
+          response: turnstileToken,
+          remoteip: request.headers.get("CF-Connecting-IP") || ""
+        }),
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+
+    if (!verificationResponse.ok) {
+      throw new Error("Turnstile verification service unavailable.");
+    }
+
+    verification = await verificationResponse.json();
+  } catch (error) {
+    console.error("Turnstile verification request failed.");
+    return json({
+      error: "Security verification is temporarily unavailable. Please try again."
+    }, 503);
+  }
+
+  if (
+    !verification.success ||
+    verification.hostname !== "private-driver-website.pages.dev"
+  ) {
+    return json({
+      error: "Security verification failed. Please try again."
+    }, 403);
+  }
+
   const reference = "RD-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
   const now = new Date().toISOString();
   try {
