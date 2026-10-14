@@ -177,7 +177,47 @@ function card(b){
   const ref=make('div','ref',b.reference+' · '+new Date(b.created_at).toLocaleString());
   const pill=make('span','pill',labels[b.status]||b.status);
   head.append(ref,pill);article.append(head);
-  article.append(make('div','route',safeText(b.pickup)+'  →  '+safeText(b.destination)));
+  
+  // MVBRI Upgrade 2: Display the complete route in travel order.
+  let stops = [];
+
+  try {
+    const parsed = JSON.parse(b.additional_stops || '[]');
+    if (Array.isArray(parsed)) {
+      stops = parsed.filter(stop => typeof stop === 'string');
+    }
+  } catch (error) {
+    console.warn('Unable to read additional stops for booking:', b.reference);
+  }
+
+  const route = make('div', 'route');
+
+  route.append(
+    make('div', '', 'Pickup: ' + safeText(b.pickup))
+  );
+
+  stops.forEach((stop, index) => {
+    const stopLine = make(
+      'div',
+      '',
+      'Stop ' + (index + 1) + ': ' + stop
+    );
+    stopLine.style.marginTop = '8px';
+    stopLine.style.fontSize = '14px';
+    stopLine.style.fontWeight = '400';
+    route.append(stopLine);
+  });
+
+  const destinationLine = make(
+    'div',
+    '',
+    'Destination: ' + safeText(b.destination)
+  );
+  destinationLine.style.marginTop = '8px';
+  route.append(destinationLine);
+
+  article.append(route);
+
   const details=make('div','details');
   const cells=[
     ['Pickup time',safeText(b.pickup_date)+' at '+safeText(b.pickup_time)],
