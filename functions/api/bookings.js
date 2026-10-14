@@ -405,13 +405,13 @@ export async function onRequestGet({ request, env }) {
     let result;
     if (status && allowed.includes(status)) {
       result = await env.DB.prepare(`
-        SELECT reference, name, phone, email, pickup, destination, pickup_date, pickup_time,
+        SELECT reference, name, phone, email, pickup, destination, additional_stops, pickup_date, pickup_time,
                passengers, trip_type, notes, status, created_at, updated_at, tip_amount, tip_recorded_at
         FROM bookings WHERE status = ? ORDER BY pickup_date DESC, pickup_time DESC LIMIT 500
       `).bind(status).all();
     } else {
       result = await env.DB.prepare(`
-        SELECT reference, name, phone, email, pickup, destination, pickup_date, pickup_time,
+        SELECT reference, name, phone, email, pickup, destination, additional_stops, pickup_date, pickup_time,
                passengers, trip_type, notes, status, created_at, updated_at, tip_amount, tip_recorded_at
         FROM bookings ORDER BY created_at DESC LIMIT 500
       `).all();
