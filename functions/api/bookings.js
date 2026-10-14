@@ -395,29 +395,80 @@ try {
   }
 }
 
+
 export async function onRequestGet({ request, env }) {
-  if (!env.DB) return json({ error: "Database is not configured." }, 503);
-  if (!await ownerSession(request, env)) return json({ error: "Please sign in as the owner." }, 401);
+  if (!env.DB) {
+    return json({ error: "Database is not configured." }, 503);
+  }
+
+  if (!await ownerSession(request, env)) {
+    return json({ error: "Please sign in as the owner." }, 401);
+  }
+
   const url = new URL(request.url);
   const status = clean(url.searchParams.get("status") || "", 20);
-  const allowed = ["new", "confirmed", "declined", "contacted", "completed", "cancelled"];
+
+  const allowed = [
+    "new", "confirmed", "declined",
+    "contacted", "completed", "cancelled"
+  ];
+
   try {
-    let result;
-    if (status && allowed.includes(status)) {
-      result = await env.DB.prepare(`
-        SELECT reference, name, phone, email, pickup, destination, additional_stops, pickup_date, pickup_time,
-               passengers, trip_type, notes, status, created_at, updated_at, tip_amount, tip_recorded_at
-        FROM bookings WHERE status = ? ORDER BY pickup_date DESC, pickup_time DESC LIMIT 500
-      `).bind(status).all();
-    } else {
-      result = await env.DB.prepare(`
-        SELECT reference, name, phone, email, pickup, destination, additional_stops, pickup_date, pickup_time,
-               passengers, trip_type, notes, status, created_at, updated_at, tip_amount, tip_recorded_at
-        FROM bookings ORDER BY created_at DESC LIMIT 500
-      `).all();
-    }
+    const query = `
+      SELECT
+        b.reference,
+        b.name,
+        b.phone,
+        b.email,
+        b.pickup,
+        b.destination,
+        b.additional_stops,
+        b.pickup_date,
+        b.pickup_time,
+        b.passengers,
+        b.trip_type,
+        b.notes,
+        b.status,
+        b.created_at,
+        b.updated_at,
+        b.tip_amount,
+        b.tip_recorded_at,
+
+        (
+          SELECT q.reference
+          FROM ride_quotes q
+          WHERE q.booking_reference = b.reference
+            AND q.status = 'accepted'
+          ORDER BY q.updated_at DESC, q.created_at DESC
+          LIMIT 1
+        ) AS accepted_quote_reference,
+
+        (
+          SELECT q.final_fare_cents
+          FROM ride_quotes q
+          WHERE q.booking_reference = b.reference
+            AND q.status = 'accepted'
+          ORDER BY q.updated_at DESC, q.created_at DESC
+          LIMIT 1
+        ) AS accepted_quote_fare_cents
+
+      FROM bookings b
+      ${status && allowed.includes(status)
+        ? "WHERE b.status = ?"
+        : ""}
+      ORDER BY b.created_at DESC
+      LIMIT 500
+    `;
+
+    const statement = env.DB.prepare(query);
+
+    const result = status && allowed.includes(status)
+      ? await statement.bind(status).all()
+      : await statement.all();
+
     return json({ bookings: result.results || [] });
-  } catch {
+  } catch (error) {
+    console.error("Could not load bookings:", error);
     return json({ error: "Could not load bookings." }, 500);
   }
 }
