@@ -176,20 +176,111 @@
       const status = document.getElementById('status');
       const token = new URLSearchParams(location.search).get('token');
 
-      // The form remains disabled until the secure review
-      // validation and submission API is implemented.
+     
+      const submitBtn = document.getElementById('submitBtn');
+      const stars = document.querySelectorAll('.star');
+      let selectedRating = 0;
+
+      // Keep the form hidden until the server verifies the link.
+      form.hidden = true;
+      submitBtn.disabled = true;
+
       if (!token) {
-        status.textContent =
-          'A valid review invitation link is required.';
+        status.textContent = 'A valid review invitation link is required.';
         return;
       }
 
-      status.textContent =
-        'Your review invitation will be available soon.';
+      status.textContent = 'Verifying your review invitation...';
 
-      // Future step: validate the token with the server,
-      // then enable the review form.
-      form.hidden = true;
+      async function validateInvitation() {
+        try {
+          const response = await fetch(
+            '/api/review-submit?token=' + encodeURIComponent(token),
+            { cache: 'no-store' }
+          );
+
+          const data = await response.json();
+
+          if (!response.ok || !data.valid) {
+            status.textContent =
+              data.error || 'This review invitation is unavailable.';
+            return;
+          }
+
+          status.textContent = 'Your verified review invitation is ready!';
+          form.hidden = false;
+          submitBtn.disabled = false;
+        } catch (error) {
+          status.textContent =
+            'Unable to verify your invitation. Please try again later.';
+        }
+      }
+
+      stars.forEach(button => {
+        button.addEventListener('click', () => {
+          selectedRating = Number(button.dataset.rating);
+
+          stars.forEach(star => {
+            star.setAttribute(
+              'aria-pressed',
+              Number(star.dataset.rating) <= selectedRating
+                ? 'true'
+                : 'false'
+            );
+          });
+        });
+      });
+
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        if (!selectedRating) {
+          status.textContent = 'Please select a star rating.';
+          return;
+        }
+
+        submitBtn.disabled = true;
+        status.textContent = 'Submitting your review...';
+
+        try {
+          const response = await fetch('/api/review-submit', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              token: token,
+              customer_name:
+                document.getElementById('customerName').value.trim(),
+              rating: selectedRating,
+              feedback:
+                document.getElementById('feedback').value.trim(),
+              permission_to_publish:
+                document.getElementById('publishPermission').checked
+            })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            status.textContent =
+              data.error || 'Could not submit your review.';
+            submitBtn.disabled = false;
+            return;
+          }
+
+          form.hidden = true;
+          status.textContent =
+            'Thank you! Your verified review has been submitted successfully.';
+        } catch (error) {
+          status.textContent =
+            'Unable to submit your review. Please try again.';
+          submitBtn.disabled = false;
+        }
+      });
+
+      validateInvitation();
+
     })();
   </script>
 </body>
