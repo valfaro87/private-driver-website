@@ -157,6 +157,39 @@ try {
     }
   }
 
+  // MVBRI Upgrade 2: Validate additional stops.
+  // Older booking clients may omit this field.
+  const additionalStops = body.additionalStops === undefined
+    ? []
+    : body.additionalStops;
+
+  if (!Array.isArray(additionalStops)) {
+    return json({
+      error: "Additional stops must be a list."
+    }, 400);
+  }
+
+  if (additionalStops.length > 10) {
+    return json({
+      error: "You can add a maximum of 10 additional stops."
+    }, 400);
+  }
+
+  for (const stop of additionalStops) {
+    if (
+      typeof stop !== "string" ||
+      stop.length > 300 ||
+      stop.trim().length === 0 ||
+      /[\u0000-\u001F\u007F]/.test(stop)
+    ) {
+      return json({
+        error: "Please enter a valid address for each additional stop (maximum 300 characters)."
+      }, 400);
+    }
+  }
+
+  const validatedStops = additionalStops.map(stop => stop.trim());
+
   const booking = {
     name: clean(body.name, 120),
     phone: clean(body.phone, 40),
@@ -334,16 +367,28 @@ try {
   const reference = "RD-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
   const now = new Date().toISOString();
   try {
+   
     await env.DB.prepare(`
       INSERT INTO bookings
-      (reference, name, phone, email, pickup, destination, pickup_date, pickup_time,
-       passengers, trip_type, notes, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)
+      (reference, name, phone, email, pickup, destination, additional_stops,
+       pickup_date, pickup_time, passengers, trip_type, notes, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?)
     `).bind(
-      reference, booking.name, booking.phone, booking.email, booking.pickup,
-      booking.destination, booking.date, booking.time, booking.passengers,
-      booking.trip, booking.notes, now
+      reference,
+      booking.name,
+      booking.phone,
+      booking.email,
+      booking.pickup,
+      booking.destination,
+      JSON.stringify(validatedStops),
+      booking.date,
+      booking.time,
+      booking.passengers,
+      booking.trip,
+      booking.notes,
+      now
     ).run();
+ 
     return json({ ok: true, reference }, 201);
   } catch {
     return json({ error: "We could not save your request right now. Please contact the driver directly." }, 500);
