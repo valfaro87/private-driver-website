@@ -607,5 +607,45 @@ quotePreview.append(issueButton);
     quoteStatus.textContent = error.message;
   }
 });
+  
+document.getElementById('calculateMileageBtn').addEventListener('click', async () => {
+  const button = document.getElementById('calculateMileageBtn');
+  const status = document.getElementById('mileageStatus');
+  const reference = document.getElementById('quoteBooking').value;
+
+  if (!reference) {
+    status.textContent = 'Please select a booking first.';
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = 'Calculating driving mileage…';
+
+  try {
+    const result = await api('/api/route-mileage', {
+      method: 'POST',
+      body: JSON.stringify({ reference })
+    });
+
+    if (!Number.isFinite(result.miles) || result.miles <= 0) {
+      throw new Error('Invalid mileage returned.');
+    }
+
+    document.getElementById('quoteMileage').value = result.miles;
+
+    status.textContent =
+      'Route calculated: ' + result.miles.toFixed(2) +
+      ' miles (' + result.stopsCount + ' additional stops). ' +
+      'Estimated mileage-based fare: $' +
+      result.mileageFare.toFixed(2) +
+      '. Review all adjustments before saving a draft.';
+  } catch (error) {
+    status.textContent =
+      error.message + ' You can enter mileage manually.';
+  } finally {
+    button.disabled = false;
+  }
+});
+
 </script>
 </body></html>
