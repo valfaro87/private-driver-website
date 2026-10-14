@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#101010">
-<title>Owner Dashboard | Private Driver</title>
+<title>Owner Dashboard | MVBRI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
@@ -15,7 +15,9 @@
 </style>
 </head>
 <body>
-<header class="bar"><div class="wrap barin"><div class="brand">PRIVATE <span>DRIVER</span> / OWNER</div><button id="logoutBtn" class="btn ghost hidden" type="button">Sign out</button></div></header>
+
+<header class="bar"><div class="wrap barin"><div class="brand">MVBRI <span>/ OWNER</span></div><button id="logoutBtn" class="btn ghost hidden" type="button">Sign out</button></div></header>
+
 <main class="wrap">
 <section id="loginPanel" class="panel login">
   <div class="ref">OWNER ACCESS</div><h1>Booking dashboard</h1>
@@ -199,7 +201,7 @@ function card(b){
     catch(e){dashStatus.textContent=e.message;}
     finally{save.disabled=false;}
   });
-  const email=make('a','btn ghost','Email customer');email.href='mailto:'+encodeURIComponent(b.email)+'?subject='+encodeURIComponent('Your private driver ride request '+b.reference);
+  const email=make('a','btn ghost','Email customer');email.href='mailto:'+encodeURIComponent(b.email)+'?subject='+encodeURIComponent('Your MVBRI ride request '+b.reference);
   const call=make('a','btn ghost','Call customer');call.href='tel:'+b.phone.replace(/[^\d+]/g,'');
   actions.append(select,save,email,call);article.append(actions);
 
