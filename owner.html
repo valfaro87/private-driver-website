@@ -183,6 +183,41 @@ function card(b){
   const pill=make('span','pill',labels[b.status]||b.status);
   head.append(ref,pill);article.append(head);
   
+  // Show accepted customer quotes without confirming the booking.
+  if (b.accepted_quote_reference) {
+    const acceptedFare = Number(b.accepted_quote_fare_cents);
+
+    const acceptedNotice = make(
+      'div',
+      '',
+      '✓ Quote Accepted — ' +
+      (Number.isFinite(acceptedFare) && acceptedFare >= 0
+        ? '$' + (acceptedFare / 100).toFixed(2)
+        : 'Amount unavailable')
+    );
+
+    acceptedNotice.style.cssText =
+      'margin-top:12px;padding:12px;' +
+      'border:1px solid #4b8062;' +
+      'color:#b9e6c9;font-size:13px;font-weight:700;';
+
+    article.append(acceptedNotice);
+
+    if (b.status === 'new') {
+      const confirmationNotice = make(
+        'div',
+        '',
+        'Awaiting owner confirmation'
+      );
+
+      confirmationNotice.style.cssText =
+        'margin-top:6px;color:var(--muted);font-size:12px;';
+
+      article.append(confirmationNotice);
+    }
+  }
+
+  
   // MVBRI Upgrade 2: Display the complete route in travel order.
   let stops = [];
 
