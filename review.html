@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Leave a Review | MVBRI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #101820;
+      color: #ffffff;
+      line-height: 1.6;
+    }
+    header {
+      padding: 24px;
+      text-align: center;
+      border-bottom: 1px solid #35404a;
+    }
+    .brand {
+      font-size: 30px;
+      font-weight: bold;
+      letter-spacing: 3px;
+    }
+    main {
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    .card {
+      background: #192530;
+      padding: 28px;
+      border-radius: 14px;
+      border: 1px solid #35404a;
+    }
+    h1 { font-size: 26px; margin-top: 0; }
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      border-radius: 8px;
+      border: 1px solid #65717c;
+      background: #101820;
+      color: white;
+      font: inherit;
+    }
+    textarea { min-height: 130px; }
+    .stars {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .star {
+      background: transparent;
+      border: 1px solid #65717c;
+      border-radius: 8px;
+      color: #f6c85f;
+      font-size: 32px;
+      cursor: pointer;
+      padding: 5px 10px;
+    }
+    .star[aria-pressed="true"] {
+      background: #394334;
+      border-color: #f6c85f;
+    }
+    .permission {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-weight: normal;
+    }
+    .permission input {
+      width: auto;
+      margin-top: 6px;
+    }
+    button[type="submit"] {
+      width: 100%;
+      padding: 14px;
+      margin-top: 24px;
+      border: none;
+      border-radius: 8px;
+      background: #d6b36a;
+      color: #101820;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .message { margin-top: 16px; }
+    .muted { color: #c5ced5; font-size: 14px; }
+    a { color: #f0d294; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">MVBRI</div>
+    <div class="muted">Private Driver Services</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h1>How Was Your Ride?</h1>
+      <p>Thank you for choosing MVBRI! We value your feedback.</p>
+
+      <p id="status" class="message" role="status">
+        Review submissions are being prepared.
+      </p>
+
+      <form id="reviewForm" hidden>
+        <label for="customerName">Display Name</label>
+        <input
+          id="customerName"
+          name="customer_name"
+          maxlength="60"
+          required
+          placeholder="Example: Jessica M."
+        >
+
+        <label>Your Rating</label>
+        <div class="stars" role="group" aria-label="Ride rating">
+          <button type="button" class="star" data-rating="1" aria-label="1 star" aria-pressed="false">★</button>
+          <button type="button" class="star" data-rating="2" aria-label="2 stars" aria-pressed="false">★</button>
+          <button type="button" class="star" data-rating="3" aria-label="3 stars" aria-pressed="false">★</button>
+          <button type="button" class="star" data-rating="4" aria-label="4 stars" aria-pressed="false">★</button>
+          <button type="button" class="star" data-rating="5" aria-label="5 stars" aria-pressed="false">★</button>
+        </div>
+
+        <label for="feedback">Tell Us About Your Experience</label>
+        <textarea
+          id="feedback"
+          name="feedback"
+          maxlength="2000"
+          required
+          placeholder="How was your ride?"
+        ></textarea>
+
+        <label class="permission">
+          <input type="checkbox" id="publishPermission">
+          I give MVBRI permission to display my review
+          and chosen display name publicly.
+        </label>
+
+        <p class="muted">
+          Your feedback can be submitted privately without
+          granting public display permission.
+        </p>
+
+        <button type="submit" id="submitBtn" disabled>
+          Submit Review
+        </button>
+      </form>
+
+      <p class="muted">
+        Please do not include sensitive personal information
+        or private trip details in your review.
+      </p>
+
+      <p><a href="/">Return to MVBRI Homepage</a></p>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const form = document.getElementById('reviewForm');
+      const status = document.getElementById('status');
+      const token = new URLSearchParams(location.search).get('token');
+
+      // The form remains disabled until the secure review
+      // validation and submission API is implemented.
+      if (!token) {
+        status.textContent =
+          'A valid review invitation link is required.';
+        return;
+      }
+
+      status.textContent =
+        'Your review invitation will be available soon.';
+
+      // Future step: validate the token with the server,
+      // then enable the review form.
+      form.hidden = true;
+    })();
+  </script>
+</body>
+</html>
