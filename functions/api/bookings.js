@@ -13,6 +13,52 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Please submit the form using the website." }, 415);
   }
 
+  // Limit booking requests by visitor IP address.
+  if (!env.BOOKING_RATE_LIMITER) {
+    console.error("Booking rate limiter binding is missing.");
+    return json({ error: "Booking service is temporarily unavailable." }, 503);
+  }
+
+  const visitorIP = request.headers.get("CF-Connecting-IP");
+  if (!visitorIP) {
+    console.error("Visitor IP address is unavailable.");
+    return json({ error: "Booking service is temporarily unavailable." }, 503);
+  }
+
+  try {
+    const limiterId = env.BOOKING_RATE_LIMITER.idFromName(
+      `booking:${visitorIP}`
+    );
+    const limiter = env.BOOKING_RATE_LIMITER.get(limiterId);
+
+    const limiterResponse = await limiter.fetch(
+      new Request("https://internal/check", { method: "POST" })
+    );
+
+    if (limiterResponse.status === 429) {
+      return json({
+        error: "Too many booking attempts. Please wait a minute and try again."
+      }, 429);
+    }
+
+   
+    if (!limiterResponse.ok) {
+      throw new Error("Rate limiter unavailable.");
+    }
+
+    const limiterResult = await limiterResponse.json();
+
+    if (limiterResult?.allowed !== true) {
+      throw new Error("Rate limiter returned an invalid response.");
+    }
+
+  } catch (error) {
+    console.error("Booking rate limiter failed:", error);
+    return json({
+      error: "Booking service is temporarily unavailable. Please try again."
+    }, 503);
+  }
+
   
 let body;
 try {
