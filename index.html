@@ -162,6 +162,28 @@
             <div class="field full"><label for="email">Email address *</label><input id="email" name="email" type="email" autocomplete="email" required></div>
             <div class="field full"><label for="pickup">Pickup address *</label><input id="pickup" name="pickup" required placeholder="Street address, airport, or landmark"></div>
             <div class="field full"><label for="destination">Destination address *</label><input id="destination" name="destination" required placeholder="Where would you like to go?"></div>
+            
+<div class="field full" id="additionalStopsField">
+  <label>Additional stops (optional)</label>
+  <p style="font-size:12px;margin:5px 0 10px">
+    Add stops in the order you want to visit them.
+    Stops included before your quote is accepted have no
+    separate stop fee; route mileage is included in pricing.
+    New stops requested on the day of your ride after
+    quote acceptance may incur a $10 fee per stop,
+    plus additional mileage charges.
+  </p>
+
+  <div id="additionalStopsList"></div>
+
+  <button
+    class="btn ghost"
+    id="addStopBtn"
+    type="button">
+    + Add another stop
+  </button>
+</div>
+
             <div class="field"><label for="date">Pickup date *</label><input id="date" name="date" type="date" required></div>
             <div class="field"><label for="time">Pickup time *</label><input id="time" name="time" type="time" required></div>
             <div class="field"><label for="passengers">Passengers *</label><select id="passengers" name="passengers" required><option value="">Select</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option></select></div>
@@ -250,6 +272,61 @@
       if (settings.phoneDisplay) el.textContent = settings.phoneDisplay;
     });
     document.getElementById('year').textContent = new Date().getFullYear();
+    
+    // MVBRI: Additional stops on the booking form.
+    const additionalStopsList =
+      document.getElementById('additionalStopsList');
+    const addStopBtn =
+      document.getElementById('addStopBtn');
+
+    let nextStopId = 0;
+    const maxAdditionalStops = 10;
+
+    addStopBtn.addEventListener('click', () => {
+      if (additionalStopsList.children.length >= maxAdditionalStops) {
+        return;
+      }
+
+      nextStopId++;
+      const stopId = 'extraStop' + nextStopId;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'field';
+      wrapper.style.marginTop = '12px';
+
+      const label = document.createElement('label');
+      label.htmlFor = stopId;
+      label.textContent = 'Additional stop address *';
+
+      const input = document.createElement('input');
+      input.id = stopId;
+      input.name = 'additionalStop';
+      input.type = 'text';
+      input.placeholder = 'Enter the stop address';
+      input.autocomplete = 'street-address';
+      input.maxLength = 300;
+      input.required = true;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn ghost';
+      removeBtn.textContent = 'Remove stop';
+      removeBtn.style.marginTop = '8px';
+
+      removeBtn.addEventListener('click', () => {
+        wrapper.remove();
+        addStopBtn.disabled = false;
+      });
+
+      wrapper.append(label, input, removeBtn);
+      additionalStopsList.append(wrapper);
+
+      if (additionalStopsList.children.length >= maxAdditionalStops) {
+        addStopBtn.disabled = true;
+      }
+    });
+
+
     const dateField = document.getElementById('date');
     dateField.min = new Date().toISOString().split('T')[0];
     document.getElementById('rideForm').addEventListener('submit', async function(e) {
@@ -260,6 +337,18 @@
      
 const d = new FormData(form);
 const payload = Object.fromEntries(d.entries());
+ 
+const additionalStops = d.getAll('additionalStop')
+  .map(stop => String(stop).trim());
+
+if (additionalStops.some(stop => !stop || stop.length > 300)) {
+  status.textContent = 'Please enter a valid address for every additional stop.';
+  return;
+}
+
+payload.additionalStops = additionalStops;
+delete payload.additionalStop;
+     
 
 // Get the Cloudflare Turnstile verification token.
 const turnstileToken = d.get('cf-turnstile-response');
@@ -290,6 +379,12 @@ status.textContent = 'Submitting your ride request securely…';
         if (!response.ok) throw new Error(result.error || 'Unable to submit the request. Please try again or contact the driver.');
         status.textContent = 'Request received. Your reference is ' + result.reference + '. The driver will contact you to confirm.';
         form.reset();
+        
+status.textContent = 'Request received. Your reference is ' + result.reference + '. The driver will contact you to confirm.';
+form.reset();
+document.getElementById('additionalStopsList').replaceChildren();
+document.getElementById('addStopBtn').disabled = false;
+
       } catch (err) {
         status.textContent = err.message || 'Could not submit. Please contact the driver directly.';
      
