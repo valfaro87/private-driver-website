@@ -707,5 +707,58 @@ document.getElementById('calculateMileageBtn').addEventListener('click', async (
   }
 });
 
+// MVBRI Owner Reviews — Load reviews
+const refreshReviewsBtn = document.getElementById('refreshReviewsBtn');
+const ownerReviewsStatus = document.getElementById('ownerReviewsStatus');
+const ownerReviewsList = document.getElementById('ownerReviewsList');
+
+async function loadOwnerReviews() {
+  refreshReviewsBtn.disabled = true;
+  ownerReviewsStatus.textContent = 'Loading customer reviews...';
+  ownerReviewsList.replaceChildren();
+
+  try {
+    const result = await api('/api/owner-reviews');
+    const reviews = result.reviews || [];
+
+    if (reviews.length === 0) {
+      ownerReviewsStatus.textContent = 'No customer reviews yet.';
+      return;
+    }
+
+    ownerReviewsStatus.textContent =
+      reviews.length + ' review(s) found.';
+
+    for (const review of reviews) {
+      const card = document.createElement('div');
+      card.className = 'panel';
+
+      const heading = document.createElement('h3');
+      heading.textContent = review.customer_name || 'Customer';
+
+      const rating = document.createElement('p');
+      rating.textContent =
+        'Rating: ' + '★'.repeat(Math.max(0, Math.min(5, Number(review.rating) || 0)));
+
+      const feedback = document.createElement('p');
+      feedback.textContent = review.feedback || 'No written feedback.';
+
+      const status = document.createElement('p');
+      status.textContent =
+        'Moderation status: ' + review.moderation_status;
+
+      card.append(heading, rating, feedback, status);
+      ownerReviewsList.append(card);
+    }
+  } catch (error) {
+    ownerReviewsStatus.textContent =
+      'Could not load reviews: ' + error.message;
+  } finally {
+    refreshReviewsBtn.disabled = false;
+  }
+}
+
+refreshReviewsBtn.addEventListener('click', loadOwnerReviews);
+
 </script>
 </body></html>
