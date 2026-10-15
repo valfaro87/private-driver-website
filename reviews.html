@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Reviews | MVBRI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f7f8fa;
+      color: #192534;
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+    }
+    header {
+      background: #101c2c;
+      color: white;
+      padding: 36px 20px;
+      text-align: center;
+    }
+    header h1 { margin: 0; }
+    header p { color: #d6dce5; }
+    main {
+      max-width: 850px;
+      margin: 35px auto;
+      padding: 0 20px;
+    }
+    .review {
+      background: white;
+      border: 1px solid #e2e6eb;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .stars {
+      color: #b8860b;
+      font-size: 23px;
+      letter-spacing: 2px;
+    }
+    .owner-reply {
+      margin-top: 18px;
+      padding: 15px;
+      background: #f0f4f8;
+      border-left: 3px solid #304b68;
+      border-radius: 5px;
+    }
+    .status { text-align: center; padding: 20px; }
+    a { color: inherit; }
+    footer {
+      text-align: center;
+      padding: 28px 20px;
+      color: #526173;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MVBRI</h1>
+    <p>Houston Private Driver Services</p>
+    <h2>Customer Reviews</h2>
+  </header>
+
+  <main>
+    <p>
+      Read feedback from customers who have
+      experienced MVBRI private driver services.
+    </p>
+
+    <div id="reviewsStatus" class="status" role="status">
+      Loading customer reviews...
+    </div>
+
+    <div id="reviewsList"></div>
+
+    <p><a href="/">← Return to MVBRI Home</a></p>
+  </main>
+
+  <footer>
+    &copy; MVBRI. All rights reserved.
+  </footer>
+
+  <script>
+    async function loadReviews() {
+      const status = document.getElementById('reviewsStatus');
+      const list = document.getElementById('reviewsList');
+
+      try {
+        const response = await fetch('/api/reviews');
+        if (!response.ok) throw new Error('Reviews unavailable.');
+
+        const data = await response.json();
+        const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+
+        status.textContent = reviews.length
+          ? ''
+          : 'No published customer reviews yet. Please check back soon.';
+
+        for (const review of reviews) {
+          const card = document.createElement('article');
+          card.className = 'review';
+
+          const name = document.createElement('h3');
+          name.textContent = review.customer_name || 'MVBRI Customer';
+
+          const stars = document.createElement('div');
+          stars.className = 'stars';
+          stars.textContent = '★'.repeat(
+            Math.max(0, Math.min(5, Number(review.rating) || 0))
+          );
+
+          const feedback = document.createElement('p');
+          feedback.textContent = review.feedback || '';
+
+          card.append(name, stars, feedback);
+
+          if (review.owner_response) {
+            const reply = document.createElement('div');
+            reply.className = 'owner-reply';
+
+            const label = document.createElement('strong');
+            label.textContent = 'Response from MVBRI';
+
+            const text = document.createElement('p');
+            text.textContent = review.owner_response;
+
+            reply.append(label, text);
+            card.append(reply);
+          }
+
+          list.append(card);
+        }
+      } catch (error) {
+        status.textContent =
+          'Customer reviews are temporarily unavailable.';
+      }
+    }
+
+    loadReviews();
+  </script>
+</body>
+</html>
