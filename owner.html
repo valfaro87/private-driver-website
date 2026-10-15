@@ -805,7 +805,59 @@ if (review.moderation_status !== 'hidden') {
   reviewActions.append(hideButton);
 }
 
-card.append(heading, rating, feedback, status, reviewActions);
+
+const replyLabel = document.createElement('label');
+replyLabel.textContent = 'Your response to this review:';
+
+const replyBox = document.createElement('textarea');
+replyBox.rows = 3;
+replyBox.maxLength = 1500;
+replyBox.value = review.owner_response || '';
+replyBox.placeholder = 'Write a professional response to this customer...';
+
+const replyButton = document.createElement('button');
+replyButton.type = 'button';
+replyButton.className = 'btn ghost';
+replyButton.textContent = 'Save Reply';
+
+const replyStatus = document.createElement('div');
+replyStatus.className = 'status';
+replyStatus.setAttribute('role', 'status');
+
+replyButton.addEventListener('click', async () => {
+  replyButton.disabled = true;
+  replyStatus.textContent = 'Saving your response...';
+
+  try {
+    await api('/api/owner-reviews', {
+      method: 'POST',
+      body: JSON.stringify({
+        review_id: review.id,
+        action: 'reply',
+        owner_response: replyBox.value
+      })
+    });
+
+    replyStatus.textContent = 'Owner reply saved successfully!';
+  } catch (error) {
+    replyStatus.textContent = 'Could not save reply: ' + error.message;
+  } finally {
+    replyButton.disabled = false;
+  }
+});
+
+card.append(
+  heading,
+  rating,
+  feedback,
+  status,
+  reviewActions,
+  replyLabel,
+  replyBox,
+  replyButton,
+  replyStatus
+);
+
 
       ownerReviewsList.append(card);
     }
