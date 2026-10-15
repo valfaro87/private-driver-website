@@ -63,9 +63,42 @@ export async function onRequestPost({ request, env }) {
       return json({ error: "Invalid review ID." }, 400);
     }
 
-    if (!["publish", "hide"].includes(action)) {
+   
+    if (!["publish", "hide", "reply"].includes(action)) {
       return json({ error: "Invalid review action." }, 400);
     }
+
+    if (action === "reply") {
+      if (typeof body?.owner_response !== "string") {
+        return json({ error: "Invalid owner response." }, 400);
+      }
+
+      const ownerResponse = body.owner_response.trim();
+
+      if (ownerResponse.length > 1500) {
+        return json({
+          error: "Owner response must be 1500 characters or fewer."
+        }, 400);
+      }
+
+      const updated = await env.DB.prepare(`
+        UPDATE customer_reviews
+        SET owner_response = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(ownerResponse || null, reviewId).run();
+
+      if (updated.meta?.changes !== 1) {
+        return json({ error: "Review not found or could not be updated." }, 404);
+      }
+
+      return json({
+        success: true,
+        review_id: reviewId,
+        owner_response: ownerResponse || null
+      });
+    }
+
 
     const existing = await env.DB.prepare(`
       SELECT id, permission_to_publish
