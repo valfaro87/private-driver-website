@@ -747,7 +747,66 @@ async function loadOwnerReviews() {
       status.textContent =
         'Moderation status: ' + review.moderation_status;
 
-      card.append(heading, rating, feedback, status);
+      
+const reviewActions = document.createElement('div');
+reviewActions.className = 'review-actions';
+
+if (review.moderation_status !== 'published') {
+  const publishButton = document.createElement('button');
+  publishButton.type = 'button';
+  publishButton.className = 'btn';
+  publishButton.textContent = 'Publish';
+
+  publishButton.addEventListener('click', async () => {
+    if (!confirm('Publish this verified customer review publicly?')) return;
+
+    publishButton.disabled = true;
+    try {
+      await api('/api/owner-reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          review_id: review.id,
+          action: 'publish'
+        })
+      });
+      await loadOwnerReviews();
+    } catch (error) {
+      ownerReviewsStatus.textContent = error.message;
+      publishButton.disabled = false;
+    }
+  });
+
+  reviewActions.append(publishButton);
+}
+
+if (review.moderation_status !== 'hidden') {
+  const hideButton = document.createElement('button');
+  hideButton.type = 'button';
+  hideButton.className = 'btn ghost';
+  hideButton.textContent = 'Hide';
+
+  hideButton.addEventListener('click', async () => {
+    hideButton.disabled = true;
+    try {
+      await api('/api/owner-reviews', {
+        method: 'POST',
+        body: JSON.stringify({
+          review_id: review.id,
+          action: 'hide'
+        })
+      });
+      await loadOwnerReviews();
+    } catch (error) {
+      ownerReviewsStatus.textContent = error.message;
+      hideButton.disabled = false;
+    }
+  });
+
+  reviewActions.append(hideButton);
+}
+
+card.append(heading, rating, feedback, status, reviewActions);
+
       ownerReviewsList.append(card);
     }
   } catch (error) {
