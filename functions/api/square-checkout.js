@@ -63,18 +63,39 @@ export async function onRequestPost({ request, env }) {
     const now = new Date().toISOString();
 
     const existing = await env.DB.prepare(
-      `SELECT status, checkout_url
-       FROM square_payments
-       WHERE quote_reference = ? AND payment_type = 'deposit'`
-    ).bind(quote.reference).first();
-
+  `SELECT status, checkout_url, square_payment_link_id,
+       square_order_id, updated_at, amount_cents, currency
+   FROM square_payments
+   WHERE quote_reference = ? AND payment_type = 'deposit'`
+).bind(quote.reference).first();
+if (
+  existing &&
+  (
+    existing.amount_cents !== deposit ||
+    existing.currency !== "USD"
+  )
+) {
+  return json({
+    error: "Deposit amount does not match the quote. Please contact MVBRI."
+  }, 409);
+}
     if (existing?.status === "paid") {
       return json({ error: "Deposit already paid." }, 409);
     }
 
-    if (existing?.checkout_url) {
-      return json({ checkoutUrl: existing.checkout_url });
-    }
+  if (existing?.checkout_url) {
+  if (
+    !existing.square_payment_link_id ||
+    !existing.square_order_id ||
+    existing.status !== "pending"
+  ) {
+    return json({
+      error: "Checkout details need review. Please contact MVBRI."
+    }, 409);
+  }
+
+  return json({ checkoutUrl: existing.checkout_url });
+}
 
     // Reserve one checkout creation per quote.
     const reservation = await env.DB.prepare(
@@ -91,11 +112,45 @@ export async function onRequestPost({ request, env }) {
       now
     ).run();
 
-    if (reservation.meta?.changes !== 1) {
-      return json({
-        error: "Checkout is being prepared. Please try again shortly."
-      }, 409);
-    }
+if (reservation.meta?.changes !== 1) {
+  const latest = await env.DB.prepare(
+  `SELECT status, checkout_url, square_payment_link_id,
+          square_order_id, amount_cents, currency
+   FROM square_payments
+   WHERE quote_reference = ? AND payment_type = 'deposit'`
+).bind(quote.reference).first();
+
+if (
+  latest?.status !== "pending" ||
+  latest.amount_cents !== deposit ||
+  latest.currency !== "USD"
+) {
+  return json({
+    error: "Checkout record requires review. Please contact MVBRI."
+  }, 409);
+}
+
+if (
+  latest.checkout_url &&
+  latest.square_payment_link_id &&
+  latest.square_order_id
+) {
+  return json({ checkoutUrl: latest.checkout_url });
+}
+ if (
+  latest.status !== "pending" ||
+  latest.square_payment_link_id ||
+  latest.square_order_id
+) {
+  return json({
+    error: "Existing checkout requires review. Please contact MVBRI."
+  }, 409);
+}
+
+return json({
+  error: "An earlier checkout attempt needs verification. Please contact MVBRI."
+}, 409);
+}
 
     const response = await fetch(
       "https://connect.squareupsandbox.com/v2/online-checkout/payment-links",
@@ -127,15 +182,26 @@ export async function onRequestPost({ request, env }) {
         error: "Square checkout could not be created."
       }, 502);
     }
-
-    await env.DB.prepare(
+if (
+  !square.payment_link.id ||
+  !square.payment_link.order_id ||
+  !square.payment_link.url
+) {
+  return json({
+    error: "Square did not return complete checkout details."
+  }, 502);
+}
+   const saved = await env.DB.prepare(
       `UPDATE square_payments
        SET square_payment_link_id = ?,
            square_order_id = ?,
            checkout_url = ?,
            updated_at = ?
-       WHERE quote_reference = ? AND payment_type = 'deposit'
-         AND status = 'pending'`
+      WHERE quote_reference = ? AND payment_type = 'deposit'
+  AND status = 'pending'
+  AND square_payment_link_id IS NULL
+  AND square_order_id IS NULL
+  AND checkout_url IS NULL`
     ).bind(
       square.payment_link.id,
       square.payment_link.order_id ?? null,
@@ -143,7 +209,11 @@ export async function onRequestPost({ request, env }) {
       new Date().toISOString(),
       quote.reference
     ).run();
-
+if (saved.meta?.changes !== 1) {
+  return json({
+    error: "Checkout details could not be saved. Please contact MVBRI."
+  }, 503);
+}
     return json({ checkoutUrl: square.payment_link.url });
 
   } catch {
