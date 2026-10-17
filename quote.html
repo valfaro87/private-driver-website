@@ -218,7 +218,11 @@
         <button id="acceptBtn" type="button">Accept Quote</button>
         <button id="declineBtn" type="button">Decline Quote</button>
       </div>
-
+<div id="paymentActions" class="actions" hidden>
+  <button id="payDepositBtn" type="button">
+    Pay 50% Deposit
+  </button>
+</div>
       <p class="notice">
         Accepting a quote records your response; it does not collect payment.
         Please contact MVBRI if you have questions about your trip.
@@ -236,7 +240,8 @@
     const actions = document.getElementById('actions');
     const acceptBtn = document.getElementById('acceptBtn');
     const declineBtn = document.getElementById('declineBtn');
-
+const paymentActions = document.getElementById('paymentActions');
+const payDepositBtn = document.getElementById('payDepositBtn');
     let currentStatus = '';
 
     function showStatus(message) {
@@ -303,13 +308,14 @@
           formatDate(quote.expiresAt);
 
         currentStatus = quote.status;
-
+paymentActions.hidden = true;
         if (quote.status === 'issued') {
           showStatus('Please review the details before responding.');
           actions.hidden = false;
         } else if (quote.status === 'accepted') {
           showStatus('This quote has already been accepted.');
           actions.hidden = true;
+          paymentActions.hidden = false;
         } else if (quote.status === 'declined') {
           showStatus('This quote has been declined.');
           actions.hidden = true;
@@ -363,6 +369,7 @@
 
         currentStatus = data.quote?.status || action;
         actions.hidden = true;
+        paymentActions.hidden = action !== 'accept';
         showStatus(
           action === 'accept'
             ? 'Thank you. Your quote acceptance has been recorded. Please contact MVBRI to confirm the ride arrangements.'
@@ -375,6 +382,59 @@
         declineBtn.disabled = false;
       }
     }
+
+async function startDepositCheckout() {
+  if (currentStatus !== 'accepted') {
+    showStatus('Please accept your quote before paying.');
+    return;
+  }
+
+  payDepositBtn.disabled = true;
+  showStatus('Preparing your secure Square Sandbox checkout…');
+
+  try {
+    const response = await fetch('/api/square-checkout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        paymentType: 'deposit'
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showStatus(data.error || 'Unable to prepare payment.');
+      return;
+    }
+
+    const checkoutUrl = new URL(data.checkoutUrl);
+
+    if (
+      checkoutUrl.protocol !== 'https:' ||
+      !['square.link', 'squareupsandbox.com', 'squareup.com']
+        .some(domain =>
+          checkoutUrl.hostname === domain ||
+          checkoutUrl.hostname.endsWith('.' + domain)
+        )
+    ) {
+      showStatus('Invalid Square checkout address.');
+      return;
+    }
+
+    window.location.assign(checkoutUrl.href);
+  } catch {
+    showStatus('Unable to connect to Square. Please try again.');
+  } finally {
+    payDepositBtn.disabled = false;
+  }
+}
+
+// Square checkout temporarily disabled until payment verification is ready.
+payDepositBtn.disabled = true;
+payDepositBtn.textContent = 'Deposit Payment — Coming Soon';
 
     acceptBtn.addEventListener('click', () => respond('accept'));
     declineBtn.addEventListener('click', () => respond('decline'));
