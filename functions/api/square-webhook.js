@@ -131,9 +131,10 @@ export async function onRequestPost({ request, env }) {
       character => character.charCodeAt(0)
     );
 
-    if (!equalBytes(expected, supplied)) {
-      return respond("Invalid signature", 401);
-    }
+   if (!equalBytes(expected, supplied)) {
+  console.error("Square webhook signature mismatch");
+  return respond("Invalid signature", 401);
+}
 
     const event = JSON.parse(body);
 
