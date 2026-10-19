@@ -178,10 +178,21 @@ return json({
     const square = await response.json();
 
     if (!response.ok || !square.payment_link?.url) {
-      return json({
-        error: "Square checkout could not be created."
-      }, 502);
-    }
+  const squareError = square.errors?.[0];
+
+  console.error("Square checkout failed:", {
+    httpStatus: response.status,
+    squareCode: squareError?.code || "UNKNOWN",
+    squareCategory: squareError?.category || "UNKNOWN"
+  });
+
+  return json({
+    error: "Square checkout could not be created.",
+    squareStatus: response.status,
+    squareCode: squareError?.code || "UNKNOWN",
+    squareCategory: squareError?.category || "UNKNOWN"
+  }, 502);
+}
 if (
   !square.payment_link.id ||
   !square.payment_link.order_id ||
