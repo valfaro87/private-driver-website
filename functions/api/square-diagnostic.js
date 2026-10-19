@@ -7,15 +7,19 @@ export async function onRequestPost({ request, env }) {
   }
 
   // This diagnostic is disabled unless explicitly enabled.
-  if (
-    env.SQUARE_DIAGNOSTIC_ENABLED !== "true" ||
-    env.SQUARE_ENVIRONMENT !== "sandbox" ||
-    !env.SQUARE_ACCESS_TOKEN ||
-    !env.SQUARE_LOCATION_ID
-  ) {
-    return json({ error: "Diagnostic unavailable." }, 503);
-  }
+  const checks = {
+  diagnosticEnabled: env.SQUARE_DIAGNOSTIC_ENABLED === "true",
+  sandboxEnvironment: env.SQUARE_ENVIRONMENT === "sandbox",
+  accessTokenPresent: Boolean(env.SQUARE_ACCESS_TOKEN),
+  locationIdPresent: Boolean(env.SQUARE_LOCATION_ID)
+};
 
+if (Object.values(checks).some(value => !value)) {
+  return json({
+    error: "Diagnostic unavailable.",
+    checks
+  }, 503);
+}
   try {
     const response = await fetch(
       "https://connect.squareupsandbox.com/v2/locations",
