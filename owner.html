@@ -145,6 +145,51 @@
   <div id="quoteStatus" class="status" role="status" aria-live="polite"></div>
   <div id="quotePreview" class="panel hidden" aria-live="polite"></div>
 </section>
+  
+<!-- MVBRI Owner Replacement Quote Links -->
+<section id="replaceQuoteLinkPanel" class="panel hidden">
+  <div class="ref">OWNER TOOLS</div>
+  <h2>Replace Customer Quote Link</h2>
+
+  <p>
+    Generate a new customer link for an existing accepted quote.
+    The previous link will stop working. The quote amount
+    and accepted status will remain unchanged.
+  </p>
+
+  <div class="field">
+    <label for="replaceQuoteReference">
+      Accepted Quote Reference
+    </label>
+    <input
+      id="replaceQuoteReference"
+      type="text"
+      placeholder="QT-XXXXXXXXXXXX"
+      maxlength="15"
+      autocomplete="off"
+    >
+  </div>
+
+  <button
+    class="btn ghost"
+    id="replaceQuoteLinkBtn"
+    type="button">
+    Generate Replacement Link
+  </button>
+
+  <div
+    id="replaceQuoteLinkStatus"
+    class="status"
+    role="status"
+    aria-live="polite">
+  </div>
+
+  <div
+    id="replaceQuoteLinkResult"
+    class="hidden">
+  </div>
+</section>
+
  <!-- MVBRI Owner Customer Reviews -->
 <section class="panel" id="ownerReviewsPanel">
   <h2>Customer Reviews Management</h2>
@@ -193,6 +238,8 @@ function showDashboard(show){
   logoutBtn.classList.toggle('hidden', !show);
   pricingPanel.classList.toggle('hidden', !show);
   quotesPanel.classList.toggle('hidden', !show);
+  document.getElementById('replaceQuoteLinkPanel')
+    .classList.toggle('hidden', !show);
 
   if (show) {
     loadPricingSettings();
@@ -483,6 +530,80 @@ const quotesPanel = document.getElementById('quotesPanel');
 const quoteBookingSelect = document.getElementById('quoteBooking');
 const quoteStatus = document.getElementById('quoteStatus');
 const quotePreview = document.getElementById('quotePreview');
+
+const replaceQuoteLinkBtn =
+  document.getElementById('replaceQuoteLinkBtn');
+
+const replaceQuoteLinkStatus =
+  document.getElementById('replaceQuoteLinkStatus');
+
+const replaceQuoteLinkResult =
+  document.getElementById('replaceQuoteLinkResult');
+
+replaceQuoteLinkBtn.addEventListener('click', async () => {
+  const reference = document
+    .getElementById('replaceQuoteReference')
+    .value.trim().toUpperCase();
+
+  replaceQuoteLinkResult.replaceChildren();
+  replaceQuoteLinkResult.classList.add('hidden');
+
+  if (!/^QT-[A-Z0-9]{12}$/.test(reference)) {
+    replaceQuoteLinkStatus.textContent =
+      'Enter a valid accepted quote reference.';
+    return;
+  }
+
+  if (!confirm(
+    'Replace the customer link for ' + reference +
+    '? The previous link will stop working.'
+  )) return;
+
+  replaceQuoteLinkBtn.disabled = true;
+  replaceQuoteLinkStatus.textContent =
+    'Generating replacement link…';
+
+  try {
+    const result = await api('/api/quotes/replace-link', {
+      method: 'POST',
+      body: JSON.stringify({ reference })
+    });
+
+    const input = document.createElement('input');
+    input.type = 'url';
+    input.readOnly = true;
+    input.value = result.quote.customerUrl;
+    input.style.width = '100%';
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'btn ghost';
+    copyButton.textContent = 'Copy Customer Link';
+
+    copyButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(input.value);
+        replaceQuoteLinkStatus.textContent =
+          'Customer link copied.';
+      } catch {
+        input.focus();
+        input.select();
+        replaceQuoteLinkStatus.textContent =
+          'Press Ctrl+C to copy the selected link.';
+      }
+    });
+
+    replaceQuoteLinkResult.append(input, copyButton);
+    replaceQuoteLinkResult.classList.remove('hidden');
+
+    replaceQuoteLinkStatus.textContent =
+      'Replacement link generated successfully.';
+  } catch (error) {
+    replaceQuoteLinkStatus.textContent = error.message;
+  } finally {
+    replaceQuoteLinkBtn.disabled = false;
+  }
+});
 
 async function loadQuoteBookings() {
   quoteBookingSelect.replaceChildren();
