@@ -435,7 +435,9 @@ async function startDepositCheckout() {
 // Square checkout temporarily disabled until payment verification is ready.
 payDepositBtn.disabled = true;
 payDepositBtn.textContent = 'Deposit Payment — Coming Soon';
-
+    
+payDepositBtn.addEventListener('click', startDepositCheckout);
+    
     acceptBtn.addEventListener('click', () => respond('accept'));
     declineBtn.addEventListener('click', () => respond('decline'));
 
