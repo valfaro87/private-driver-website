@@ -558,7 +558,7 @@ replaceQuoteLinkBtn.addEventListener('click', async () => {
     'Replace the customer link for ' + reference +
     '? The previous link will stop working.'
   )) return;
-
+if (replaceQuoteLinkBtn.disabled) return;
   replaceQuoteLinkBtn.disabled = true;
   replaceQuoteLinkStatus.textContent =
     'Generating replacement link…';
@@ -596,8 +596,9 @@ replaceQuoteLinkBtn.addEventListener('click', async () => {
     replaceQuoteLinkResult.append(input, copyButton);
     replaceQuoteLinkResult.classList.remove('hidden');
 
-    replaceQuoteLinkStatus.textContent =
-      'Replacement link generated successfully.';
+    replaceQuoteLinkStatus.textContent = result.emailSent
+  ? 'Replacement link generated. Email accepted by Resend for sending.'
+  : 'Replacement link generated, but email was not sent. Copy the customer link and send it manually.';
   } catch (error) {
     replaceQuoteLinkStatus.textContent = error.message;
   } finally {
