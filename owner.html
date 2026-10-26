@@ -511,7 +511,10 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
   try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({password:document.getElementById('password').value})});document.getElementById('password').value='';showDashboard(true);await loadBookings();}
   catch(err){loginStatus.textContent=err.message;}
 });
-document.getElementById('refreshBtn').addEventListener('click',loadBookings);
+document.getElementById('refreshBtn').addEventListener('click',async()=>{
+  await loadBookings();
+  if (ownerActive) await loadQuoteBookings();
+});
 document.getElementById('filter').addEventListener('change',()=>{
   const filter=document.getElementById('filter').value;
   const shown=filter?allBookings.filter(b=>b.status===filter):allBookings;
@@ -889,7 +892,7 @@ issueButton.addEventListener('click', async () => {
 
     quotePreview.append(linkLabel, linkInput, copyButton);
     quoteStatus.textContent =
-      'Quote issued. The customer page is not ready yet, so do not send this link.';
+      'Quote issued. The customer link is ready. Review it before sharing it with the customer.';
   } catch (error) {
     quoteStatus.textContent = error.message;
     issueButton.disabled = false;
@@ -1089,6 +1092,22 @@ card.append(
 }
 
 refreshReviewsBtn.addEventListener('click', loadOwnerReviews);
+
+// Restore only a server-verified owner session; keep private panels hidden while checking.
+async function restoreOwnerSession() {
+  const generation = mileageGeneration;
+  try {
+    await api('/api/bookings');
+    if (ownerActive || generation !== mileageGeneration) return;
+    showDashboard(true);
+    await loadBookings();
+  } catch (error) {
+    if (error.status !== 401 && !ownerActive && generation === mileageGeneration) {
+      loginStatus.textContent = 'Session check unavailable. Please sign in.';
+    }
+  }
+}
+restoreOwnerSession();
 
 </script>
 </body></html>
