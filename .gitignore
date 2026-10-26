@@ -1,0 +1,6 @@
+.openai/
+.qa/
+node_modules/
+.dev.vars
+wrangler.toml
+.wrangler/

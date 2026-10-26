@@ -1,5 +1,5 @@
 
-import { ownerSession } from "../_lib/auth.js";
+import { ownerSession, sameOrigin } from "../_lib/auth.js";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -47,6 +47,8 @@ export async function onRequestGet({ request, env }) {
 
 // OWNER ONLY: Publish or hide a review.
 export async function onRequestPost({ request, env }) {
+  if (!sameOrigin(request)) return json({error:'Request rejected.'},403);
+  if (!(request.headers.get('content-type') || '').includes('application/json')) return json({error:'JSON required.'},415);
   try {
     const owner = await ownerSession(request, env);
 
@@ -54,7 +56,10 @@ export async function onRequestPost({ request, env }) {
       return json({ error: "Owner login required." }, 401);
     }
 
-    const body = await request.json().catch(() => null);
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > 10000) return json({error:'Request too large.'},413);
+    let body;
+    try { body=JSON.parse(raw); } catch {return json({error:'Invalid request.'},400);}
 
     const reviewId = Number(body?.review_id);
     const action = body?.action;
@@ -84,6 +89,7 @@ export async function onRequestPost({ request, env }) {
       const updated = await env.DB.prepare(`
         UPDATE customer_reviews
         SET owner_response = ?,
+            owner_response_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).bind(ownerResponse || null, reviewId).run();

@@ -1,4 +1,5 @@
 
+import { paymentSummary } from "../../_lib/square.js";
 import { json, sameOrigin } from "../../_lib/auth.js";
 
 async function getTokenHash(token) {
@@ -100,8 +101,12 @@ export async function onRequestGet({ request, env }) {
 
     quote = await expireIfNeeded(env, quote);
 
+    let payments = { enabled: false };
+    try { payments = await paymentSummary(env, quote); } catch {
+      // Payment configuration must never prevent a customer reading a quote.
+    }
     return new Response(
-      JSON.stringify({ quote: publicQuote(quote) }),
+      JSON.stringify({ quote: { ...publicQuote(quote), payments } }),
       {
         status: 200,
         headers: {

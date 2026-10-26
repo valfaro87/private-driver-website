@@ -357,7 +357,8 @@ try {
 
   if (
     !verification.success ||
-    verification.hostname !== "private-driver-website.pages.dev"
+    !(env.TURNSTILE_ALLOWED_HOSTNAMES || "private-driver-website.pages.dev")
+      .split(",").map(host => host.trim().toLowerCase()).includes(String(verification.hostname || "").toLowerCase())
   ) {
     return json({
       error: "Security verification failed. Please try again."

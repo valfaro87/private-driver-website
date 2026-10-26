@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
   <title>Your Ride Quote | MVBRI</title>
   <style>
     :root {
@@ -218,10 +219,13 @@
         <button id="acceptBtn" type="button">Accept Quote</button>
         <button id="declineBtn" type="button">Decline Quote</button>
       </div>
+<p id="paymentInfo" class="notice" hidden></p>
 <div id="paymentActions" class="actions" hidden>
   <button id="payDepositBtn" type="button">
     Pay 50% Deposit
   </button>
+  <button id="payBalanceBtn" type="button" hidden>Pay remaining balance</button>
+  <button id="checkPaymentBtn" type="button">Check payment status</button>
 </div>
       <p class="notice">
         Accepting a quote records your response; it does not collect payment.
@@ -234,7 +238,8 @@
     MVBRI · Houston, Texas · (346) 557-5796
   </footer>
 
-  <script>
+  <script type="module">
+    import { quoteState } from './assets/quote-state.js';
     const token = new URLSearchParams(location.search).get('token');
     const statusMessage = document.getElementById('statusMessage');
     const actions = document.getElementById('actions');
@@ -242,7 +247,43 @@
     const declineBtn = document.getElementById('declineBtn');
 const paymentActions = document.getElementById('paymentActions');
 const payDepositBtn = document.getElementById('payDepositBtn');
+const payBalanceBtn = document.getElementById('payBalanceBtn');
+const checkPaymentBtn = document.getElementById('checkPaymentBtn');
+const paymentInfo = document.getElementById('paymentInfo');
+function renderPayments(quote) {
+  const payment = quote?.payments;
+  const enabled = quoteState(quote).canPay && payment?.enabled === true;
+  paymentInfo.hidden = !quoteState(quote).canPay;
+  paymentActions.hidden = !enabled;
+  payDepositBtn.hidden = !enabled || !payment.canPayDeposit;
+  payBalanceBtn.hidden = !enabled || !payment.canPayBalance;
+  const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
+  payDepositBtn.textContent = enabled ? 'Pay 50% deposit — ' + money(payment.deposit) : 'Payment unavailable';
+  payBalanceBtn.textContent = enabled ? 'Pay remaining balance — ' + money(payment.balance) : 'Payment unavailable';
+  paymentInfo.textContent = !enabled ? 'Secure payment is unavailable. Please contact MVBRI.' :
+    (payment.environment === 'sandbox' ? 'Sandbox test checkout only. No real payment. Test cards only. ' :
+     'Secure Square checkout. ' + payment.methods.join(', ') + '. Eligible wallets appear on supported devices. ') +
+    (payment.balancePaid ? 'Your fare payments are verified.' : payment.depositPaid ?
+      'Your deposit is verified. The balance is available after trip completion.' :
+      'Your 50% deposit will be verified after Square confirms payment.') +
+    (enabled && !payment.balancePaid ? ' After checkout, return to this quote and select Check payment status.' : '');
+}
     let currentStatus = '';
+    let currentQuote = null;
+    let expiryTimer;
+    function renderQuoteState(quote) {
+      clearTimeout(expiryTimer);
+      const state = quoteState(quote);
+      currentStatus = state.status;
+      actions.hidden = !state.canRespond;
+      renderPayments(quote);
+      acceptBtn.disabled = declineBtn.disabled = !state.canRespond;
+      showStatus(state.message);
+      if (state.canRespond) {
+        expiryTimer = setTimeout(() => renderQuoteState(quote),
+          Math.min(2147483647, Math.max(1, Date.parse(quote.expiresAt) - Date.now())));
+      }
+    }
 
     function showStatus(message) {
       statusMessage.textContent = message;
@@ -260,6 +301,8 @@ const payDepositBtn = document.getElementById('payDepositBtn');
     }
 
     async function loadQuote() {
+      // Fail closed on reload errors instead of leaving stale controls visible.
+      renderQuoteState(null);
       if (!token || token.length > 200) {
         showStatus('This quote link is missing or invalid. Please contact MVBRI.');
         return;
@@ -307,28 +350,8 @@ const payDepositBtn = document.getElementById('payDepositBtn');
         document.getElementById('expiresAt').textContent =
           formatDate(quote.expiresAt);
 
-        currentStatus = quote.status;
-paymentActions.hidden = true;
-        if (quote.status === 'issued') {
-          showStatus('Please review the details before responding.');
-          actions.hidden = false;
-        } else if (quote.status === 'accepted') {
-          showStatus('This quote has already been accepted.');
-          actions.hidden = true;
-          paymentActions.hidden = false;
-        } else if (quote.status === 'declined') {
-          showStatus('This quote has been declined.');
-          actions.hidden = true;
-        } else if (quote.status === 'expired') {
-          showStatus('This quote has expired. Please contact MVBRI for an updated quote.');
-          actions.hidden = true;
-        } else if (quote.status === 'cancelled' ||
-                   quote.status === 'superseded') {
-          showStatus('This quote is no longer active. Please contact MVBRI.');
-          actions.hidden = true;
-        } else {
-          showStatus('This quote is not available for a customer response.');
-        }
+        currentQuote = quote;
+        renderQuoteState(quote);
       } catch {
         showStatus('Unable to load your quote right now. Please try again later.');
       }
@@ -367,9 +390,10 @@ paymentActions.hidden = true;
           return;
         }
 
-        currentStatus = data.quote?.status || action;
-        actions.hidden = true;
-        paymentActions.hidden = action !== 'accept';
+        currentQuote = { ...currentQuote, status: data.quote?.status ||
+          (action === 'accept' ? 'accepted' : 'declined') };
+        renderQuoteState(currentQuote);
+        await loadQuote();
         showStatus(
           action === 'accept'
             ? 'Thank you. Your quote acceptance has been recorded. Please contact MVBRI to confirm the ride arrangements.'
@@ -378,19 +402,19 @@ paymentActions.hidden = true;
       } catch {
         showStatus('We could not submit your response. Please try again.');
       } finally {
-        acceptBtn.disabled = false;
-        declineBtn.disabled = false;
+        const canRespond = quoteState(currentQuote).canRespond && currentStatus === 'issued';
+        acceptBtn.disabled = declineBtn.disabled = !canRespond;
       }
     }
 
-async function startDepositCheckout() {
+async function startCheckout(paymentType) {
   if (currentStatus !== 'accepted') {
     showStatus('Please accept your quote before paying.');
     return;
   }
 
-  payDepositBtn.disabled = true;
-  showStatus('Preparing your secure Square Sandbox checkout…');
+  payDepositBtn.disabled = payBalanceBtn.disabled = true;
+  showStatus('Preparing your secure checkout…');
 
   try {
     const response = await fetch('/api/square-checkout', {
@@ -399,7 +423,7 @@ async function startDepositCheckout() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
-        paymentType: 'deposit'
+        paymentType
       })
     });
 
@@ -414,7 +438,7 @@ async function startDepositCheckout() {
 
     if (
       checkoutUrl.protocol !== 'https:' ||
-      !['square.link', 'squareupsandbox.com', 'squareup.com']
+      !['square.link', 'squareupsandbox.com', 'squareup.com', 'square.site']
         .some(domain =>
           checkoutUrl.hostname === domain ||
           checkoutUrl.hostname.endsWith('.' + domain)
@@ -428,16 +452,29 @@ async function startDepositCheckout() {
   } catch {
     showStatus('Unable to connect to Square. Please try again.');
   } finally {
-    payDepositBtn.disabled = false;
+    payDepositBtn.disabled = payBalanceBtn.disabled = false;
   }
 }
 
-// Square checkout temporarily disabled until payment verification is ready.
-payDepositBtn.disabled = true;
-payDepositBtn.textContent = 'Deposit Payment — Coming Soon';
-    
-payDepositBtn.addEventListener('click', startDepositCheckout);
-    
+checkPaymentBtn.addEventListener('click', async () => {
+  if(currentStatus!=='accepted')return;
+  checkPaymentBtn.disabled=true;
+  showStatus('Checking payment with Square…');
+  try {
+    const response=await fetch('/api/square-status',{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error || 'Payment verification is unavailable.');
+    await loadQuote();
+    showStatus(data.payments?.balancePaid ? 'Your fare payments are verified.' :
+      data.payments?.depositPaid ? 'Your deposit is verified.' : 'Square has not confirmed a completed payment yet. Check again after checkout.');
+  } catch(error){showStatus(error.message);}
+  finally {checkPaymentBtn.disabled=false;}
+});
+
+payDepositBtn.addEventListener('click', () => startCheckout('deposit'));
+payBalanceBtn.addEventListener('click', () => startCheckout('balance'));
+
     acceptBtn.addEventListener('click', () => respond('accept'));
     declineBtn.addEventListener('click', () => respond('decline'));
 

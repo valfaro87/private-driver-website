@@ -1,5 +1,5 @@
 
-import { ownerSession } from "../_lib/auth.js";
+import { ownerSession, sameOrigin } from "../_lib/auth.js";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -25,6 +25,8 @@ async function hashToken(token) {
 }
 
 export async function onRequestPost({ request, env }) {
+  if (!sameOrigin(request)) return json({error:'Request rejected.'},403);
+  if (!(request.headers.get('content-type') || '').includes('application/json')) return json({error:'JSON required.'},415);
   if (!env.DB) {
     return json({ error: "Database is not configured." }, 503);
   }

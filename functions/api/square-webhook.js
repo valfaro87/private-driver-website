@@ -1,3 +1,4 @@
+import { squareConfig } from "../_lib/square.js";
 
 function respond(message, status = 200) {
   return new Response(JSON.stringify({ message }), {
@@ -8,33 +9,10 @@ function respond(message, status = 200) {
     }
   });
 }
-async function fetchSquareMerchant(env) {
-  const response = await fetch(
-    "https://connect.squareupsandbox.com/v2/merchants/me",
-    {
-      headers: {
-        Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
-        "Square-Version": "2026-09-16"
-      }
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Unable to verify Square merchant.");
-  }
-
-  const data = await response.json();
-
-  if (!data.merchant?.id) {
-    throw new Error("Invalid Square merchant response.");
-  }
-
-  return data.merchant.id;
-}
 async function fetchSquarePayment(env, paymentId) {
   if (
     !env.SQUARE_ACCESS_TOKEN ||
-    env.SQUARE_ENVIRONMENT !== "sandbox" ||
+    !squareConfig(env) ||
     typeof paymentId !== "string" ||
     !/^[a-zA-Z0-9_-]{1,192}$/.test(paymentId)
   ) {
@@ -42,7 +20,7 @@ async function fetchSquarePayment(env, paymentId) {
   }
 
   const response = await fetch(
-    "https://connect.squareupsandbox.com/v2/payments/" +
+    squareConfig(env).origin + "/v2/payments/" +
       encodeURIComponent(paymentId),
     {
       headers: {
@@ -81,7 +59,7 @@ function equalBytes(a, b) {
 
 export async function onRequestPost({ request, env }) {
  if (
-  env.SQUARE_ENVIRONMENT !== "sandbox" ||
+  !squareConfig(env) ||
   !env.SQUARE_WEBHOOK_SIGNATURE_KEY ||
   !env.SQUARE_WEBHOOK_URL ||
   !env.SQUARE_ACCESS_TOKEN ||
@@ -126,10 +104,10 @@ export async function onRequestPost({ request, env }) {
       )
     );
 
-    const supplied = Uint8Array.from(
-      atob(signature),
-      character => character.charCodeAt(0)
-    );
+    let supplied;
+    try {
+      supplied = Uint8Array.from(atob(signature), character => character.charCodeAt(0));
+    } catch { return respond("Invalid signature", 401); }
 
    if (!equalBytes(expected, supplied)) {
   console.error("Square webhook signature mismatch");
@@ -168,10 +146,9 @@ const record = await env.DB.prepare(
        square_order_id, square_payment_id
    FROM square_payments
    WHERE square_order_id = ?
-     AND payment_type = 'deposit'
-     AND square_environment = 'sandbox'
+     AND square_environment = ?
    LIMIT 1`
-).bind(payment.order_id || "").first();
+).bind(payment.order_id || "", env.SQUARE_ENVIRONMENT).first();
 
 if (!record) {
   return respond("No matching MVBRI deposit");
@@ -217,14 +194,15 @@ const result = await env.DB.prepare(
      AND square_order_id = ?
      AND amount_cents = ?
      AND currency = 'USD'
-     AND square_environment = 'sandbox'`
+     AND square_environment = ?`
 ).bind(
   payment.id,
   now,
   now,
   record.id,
   payment.order_id,
-  payment.amount_money.amount
+  payment.amount_money.amount,
+  env.SQUARE_ENVIRONMENT
 ).run();
 
 if (result.meta?.changes !== 1) {

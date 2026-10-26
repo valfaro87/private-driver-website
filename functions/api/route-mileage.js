@@ -30,7 +30,7 @@ function dayInHouston() {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.DB || !env.GOOGLE_MAPS_API_KEY) {
+  if (!env.DB) {
     return json({ error: "Mileage service is not configured." }, 503);
   }
 
@@ -41,6 +41,8 @@ export async function onRequestPost({ request, env }) {
   if (!await ownerSession(request, env)) {
     return json({ error: "Please log in as the owner." }, 401);
   }
+
+  if (!env.GOOGLE_MAPS_API_KEY) return json({ error: "Mileage service is not configured." }, 503);
 
   const contentType = request.headers.get("content-type") || "";
   if (!contentType.toLowerCase().includes("application/json")) {
@@ -79,7 +81,7 @@ export async function onRequestPost({ request, env }) {
 
   try {
     booking = await env.DB.prepare(`
-      SELECT reference, pickup, destination, additional_stops
+      SELECT reference, pickup, destination, additional_stops, trip_type
       FROM bookings
       WHERE reference = ?
     `).bind(body.reference).first();
@@ -134,14 +136,16 @@ export async function onRequestPost({ request, env }) {
     }, 429);
   }
 
+  const roundTrip = booking.trip_type === "Round trip";
+  const routeStops = roundTrip ? [...stops, booking.destination] : stops;
   const routeRequest = {
     origin: {
       address: booking.pickup.trim()
     },
     destination: {
-      address: booking.destination.trim()
+      address: (roundTrip ? booking.pickup : booking.destination).trim()
     },
-    intermediates: stops.map(address => ({
+    intermediates: routeStops.map(address => ({
       address: address.trim()
     })),
     travelMode: "DRIVE",
@@ -224,6 +228,8 @@ export async function onRequestPost({ request, env }) {
     reference: booking.reference,
     miles,
     stopsCount: stops.length,
+    roundTrip,
+    attribution: "Google Maps",
     mileageFare: mileageFareCents / 100,
     minimumFare: minimumFareCents / 100,
     pricePerMile: pricePerMileCents / 100,

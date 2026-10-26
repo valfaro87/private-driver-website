@@ -1,3 +1,4 @@
+import { sameOrigin } from "../_lib/auth.js";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -101,6 +102,7 @@ export async function onRequestGet({ request, env }) {
 
 
 export async function onRequestPost({ request, env }) {
+  if (!sameOrigin(request)) return json({error:"Request rejected."},403);
   if (!env.DB) {
     return json({ error: "Reviews are unavailable." }, 503);
   }

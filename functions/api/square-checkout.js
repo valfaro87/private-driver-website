@@ -1,235 +1,105 @@
-
-import { json, sameOrigin } from "../_lib/auth.js";
+import { json, sameOrigin, sha256Hex } from '../_lib/auth.js';
+import { squareConfig, validCheckoutUrl } from '../_lib/square.js';
 
 export async function onRequestPost({ request, env }) {
-  if (!sameOrigin(request)) {
-    return json({ error: "Request rejected." }, 403);
+  if (!sameOrigin(request)) return json({ error: 'Request rejected.' }, 403);
+  const config = squareConfig(env);
+  if (!env.DB || !config) return json({ error: 'Secure payment collection is not configured.' }, 503);
+  if (!(request.headers.get('content-type') || '').includes('application/json')) {
+    return json({ error: 'JSON required.' }, 415);
   }
-
-  if (
-    !env.DB ||
-    !env.SQUARE_ACCESS_TOKEN ||
-    !env.SQUARE_LOCATION_ID ||
-    env.SQUARE_ENVIRONMENT !== "sandbox"
-  ) {
-    return json({ error: "Square Sandbox is not configured." }, 503);
-  }
-
   let body;
   try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Invalid request." }, 400);
-  }
-
-  if (body?.paymentType !== "deposit") {
-    return json({ error: "Invalid payment type." }, 400);
-  }
-
-  const token = body?.token;
-
-  if (typeof token !== "string" || !/^[a-f0-9]{64}$/i.test(token)) {
-    return json({ error: "Invalid quote link." }, 400);
-  }
-
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > 2048) return json({error:'Request too large.'},413);
+    body = JSON.parse(raw);
+  } catch { return json({ error: 'Invalid request.' }, 400); }
+  const type = body?.paymentType;
+  if (!['deposit', 'balance'].includes(type) || typeof body?.token !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(body.token)) return json({ error: 'Invalid payment request.' }, 400);
   try {
-    const digest = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(token.toLowerCase())
-    );
-
-    const tokenHash = Array.from(new Uint8Array(digest))
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-
-    const quote = await env.DB.prepare(
-      `SELECT reference, booking_reference, status, final_fare_cents
-       FROM ride_quotes
-       WHERE customer_token_hash = ?
-       LIMIT 1`
-    ).bind(tokenHash).first();
-
-    if (!quote || quote.status !== "accepted") {
-      return json({ error: "An accepted quote is required." }, 409);
+    const hash = await sha256Hex(body.token.toLowerCase());
+    const quote = await env.DB.prepare(`SELECT q.reference, q.booking_reference, q.status,
+      q.final_fare_cents, b.status AS booking_status FROM ride_quotes q
+      JOIN bookings b ON b.reference = q.booking_reference WHERE q.customer_token_hash = ? LIMIT 1`)
+      .bind(hash).first();
+    if (!quote || quote.status !== 'accepted' || ['cancelled','declined'].includes(quote.booking_status)) {
+      return json({ error: 'An active accepted quote is required.' }, 409);
     }
-
     const total = quote.final_fare_cents;
-
-    if (!Number.isSafeInteger(total) || total < 2) {
-      return json({ error: "Invalid quote amount." }, 400);
-    }
-
+    if (!Number.isSafeInteger(total) || total < 2) return json({ error: 'Invalid quote amount.' }, 400);
     const deposit = Math.round(total / 2);
-    const now = new Date().toISOString();
-
-    const existing = await env.DB.prepare(
-  `SELECT status, checkout_url, square_payment_link_id,
-       square_order_id, updated_at, amount_cents, currency
-   FROM square_payments
-   WHERE quote_reference = ? AND payment_type = 'deposit'`
-).bind(quote.reference).first();
-if (
-  existing &&
-  (
-    existing.amount_cents !== deposit ||
-    existing.currency !== "USD"
-  )
-) {
-  return json({
-    error: "Deposit amount does not match the quote. Please contact MVBRI."
-  }, 409);
-}
-    if (existing?.status === "paid") {
-      return json({ error: "Deposit already paid." }, 409);
-    }
-
-  if (existing?.checkout_url) {
-  if (
-    !existing.square_payment_link_id ||
-    !existing.square_order_id ||
-    existing.status !== "pending"
-  ) {
-    return json({
-      error: "Checkout details need review. Please contact MVBRI."
-    }, 409);
-  }
-
-  return json({ checkoutUrl: existing.checkout_url });
-}
-
-    // Reserve one checkout creation per quote.
-    const reservation = await env.DB.prepare(
-      `INSERT OR IGNORE INTO square_payments
-       (quote_reference, booking_reference, payment_type,
-        amount_cents, currency, status, square_environment,
-        created_at, updated_at)
-       VALUES (?, ?, 'deposit', ?, 'USD', 'pending', 'sandbox', ?, ?)`
-    ).bind(
-      quote.reference,
-      quote.booking_reference,
-      deposit,
-      now,
-      now
-    ).run();
-
-if (reservation.meta?.changes !== 1) {
-  const latest = await env.DB.prepare(
-  `SELECT status, checkout_url, square_payment_link_id,
-          square_order_id, amount_cents, currency
-   FROM square_payments
-   WHERE quote_reference = ? AND payment_type = 'deposit'`
-).bind(quote.reference).first();
-
-if (
-  latest?.status !== "pending" ||
-  latest.amount_cents !== deposit ||
-  latest.currency !== "USD"
-) {
-  return json({
-    error: "Checkout record requires review. Please contact MVBRI."
-  }, 409);
-}
-
-if (
-  latest.checkout_url &&
-  latest.square_payment_link_id &&
-  latest.square_order_id
-) {
-  return json({ checkoutUrl: latest.checkout_url });
-}
- if (
-  latest.status !== "pending" ||
-  latest.square_payment_link_id ||
-  latest.square_order_id
-) {
-  return json({
-    error: "Existing checkout requires review. Please contact MVBRI."
-  }, 409);
-}
-
-return json({
-  error: "An earlier checkout attempt needs verification. Please contact MVBRI."
-}, 409);
-}
-
-    const response = await fetch(
-      "https://connect.squareupsandbox.com/v2/online-checkout/payment-links",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.SQUARE_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-          "Square-Version": "2025-01-23"
-        },
-        body: JSON.stringify({
-          idempotency_key: `mvbri-deposit-${quote.reference}`,
-          quick_pay: {
-            name: "MVBRI Ride Deposit",
-            price_money: {
-              amount: deposit,
-              currency: "USD"
-            },
-            location_id: env.SQUARE_LOCATION_ID
-          }
-        })
+    if (type === 'balance') {
+      const paid = await env.DB.prepare(`SELECT status, amount_cents, square_environment
+        FROM square_payments WHERE quote_reference = ? AND payment_type = 'deposit'`).bind(quote.reference).first();
+      if (quote.booking_status !== 'completed' || paid?.status !== 'paid' ||
+          paid.amount_cents !== deposit || paid.square_environment !== config.mode) {
+        return json({error:'The verified deposit and completed ride are required before balance payment.'},409);
       }
-    );
-
-    const square = await response.json();
-
-    if (!response.ok || !square.payment_link?.url) {
-  const squareError = square.errors?.[0];
-
-  console.error("Square checkout failed:", {
-    httpStatus: response.status,
-    squareCode: squareError?.code || "UNKNOWN",
-    squareCategory: squareError?.category || "UNKNOWN"
-  });
-
-  return json({
-    error: "Square checkout could not be created.",
-    squareStatus: response.status,
-    squareCode: squareError?.code || "UNKNOWN",
-    squareCategory: squareError?.category || "UNKNOWN"
-  }, 502);
-}
-if (
-  !square.payment_link.id ||
-  !square.payment_link.order_id ||
-  !square.payment_link.url
-) {
-  return json({
-    error: "Square did not return complete checkout details."
-  }, 502);
-}
-   const saved = await env.DB.prepare(
-      `UPDATE square_payments
-       SET square_payment_link_id = ?,
-           square_order_id = ?,
-           checkout_url = ?,
-           updated_at = ?
-      WHERE quote_reference = ? AND payment_type = 'deposit'
-  AND status = 'pending'
-  AND square_payment_link_id IS NULL
-  AND square_order_id IS NULL
-  AND checkout_url IS NULL`
-    ).bind(
-      square.payment_link.id,
-      square.payment_link.order_id ?? null,
-      square.payment_link.url,
-      new Date().toISOString(),
-      quote.reference
-    ).run();
-if (saved.meta?.changes !== 1) {
-  return json({
-    error: "Checkout details could not be saved. Please contact MVBRI."
-  }, 503);
-}
-    return json({ checkoutUrl: square.payment_link.url });
-
+    }
+    const amount = type === 'deposit' ? deposit : total - deposit;
+    const now = new Date().toISOString();
+    const checkoutKey = `mvbri-v2-${type}-${quote.reference}`;
+    const payload = JSON.stringify({
+      idempotency_key: checkoutKey,
+      quick_pay: { name: type === 'deposit' ? 'MVBRI Ride Deposit' : 'MVBRI Ride Balance',
+        price_money: {amount, currency:'USD'}, location_id: env.SQUARE_LOCATION_ID },
+      checkout_options: { allow_tipping: false, ask_for_shipping_address: false,
+        accepted_payment_methods: {apple_pay:config.mode === 'production',
+          google_pay:config.mode === 'production', cash_app_pay:config.mode === 'production', afterpay_clearpay:false} }
+    });
+    await env.DB.prepare(`INSERT OR IGNORE INTO square_payments
+      (quote_reference,booking_reference,payment_type,amount_cents,currency,status,square_environment,
+       created_at,updated_at,checkout_key,checkout_request) VALUES (?,?,?,?,'USD','pending',?,?,?,?,?)`)
+      .bind(quote.reference,quote.booking_reference,type,amount,config.mode,now,now,checkoutKey,payload).run();
+    const load = () => env.DB.prepare(`SELECT * FROM square_payments WHERE quote_reference = ? AND payment_type = ?`)
+      .bind(quote.reference,type).first();
+    const record = await load();
+    if (!record || record.amount_cents !== amount || record.currency !== 'USD' || record.square_environment !== config.mode) {
+      return json({error:'Payment record does not match this quote. Please contact MVBRI.'},409);
+    }
+    if (record.status !== 'pending') return json({error:record.status === 'paid' ? 'This payment is already verified.' : 'This payment requires owner review.'},409);
+    if (record.checkout_url) {
+      if (!record.square_order_id || !record.square_payment_link_id || !validCheckoutUrl(record.checkout_url,config.mode)) {
+        return json({error:'Checkout requires owner review.'},409);
+      }
+      return json({checkoutUrl:record.checkout_url,environment:config.mode});
+    }
+    if (!record.checkout_key || !record.checkout_request || record.square_order_id || record.square_payment_link_id) {
+      return json({error:'An earlier checkout needs owner verification before retrying.'},409);
+    }
+    const savedRequest = JSON.parse(record.checkout_request);
+    if (savedRequest.idempotency_key !== record.checkout_key ||
+        savedRequest.quick_pay?.location_id !== env.SQUARE_LOCATION_ID ||
+        savedRequest.quick_pay?.price_money?.amount !== amount ||
+        savedRequest.quick_pay?.price_money?.currency !== 'USD') {
+      return json({error:'Saved checkout configuration requires owner review.'},409);
+    }
+    // Retry the exact saved request and key. Square deduplicates ambiguous failures
+    // and concurrent clicks; a browser can never choose the amount or location.
+    const response = await fetch(config.origin + '/v2/online-checkout/payment-links', {
+      method:'POST', headers:{Authorization:`Bearer ${env.SQUARE_ACCESS_TOKEN}`,
+        'Content-Type':'application/json','Square-Version':'2026-09-16'},
+      body:record.checkout_request, signal:AbortSignal.timeout(15000)
+    });
+    const data = await response.json();
+    const link = data.payment_link;
+    if (!response.ok || !link?.id || !link.order_id || !validCheckoutUrl(link.url,config.mode)) {
+      console.error('Square checkout failed', response.status, data.errors?.[0]?.code || 'INVALID_RESPONSE');
+      return json({error:'Checkout is temporarily unavailable. Retry safely or contact MVBRI.'},502);
+    }
+    const saved = await env.DB.prepare(`UPDATE square_payments SET square_payment_link_id = ?,
+      square_order_id = ?, checkout_url = ?, updated_at = ? WHERE id = ? AND status = 'pending'
+      AND square_order_id IS NULL AND square_payment_link_id IS NULL AND checkout_url IS NULL`)
+      .bind(link.id,link.order_id,link.url,new Date().toISOString(),record.id).run();
+    if (saved.meta?.changes !== 1) {
+      const latest = await load();
+      if (latest?.status !== 'pending' || latest.square_order_id !== link.order_id || latest.checkout_url !== link.url) {
+        return json({error:'Checkout status changed. Refresh your quote before paying.'},409);
+      }
+    }
+    return json({checkoutUrl:link.url,environment:config.mode});
   } catch {
-    return json({
-      error: "Unable to prepare checkout. Please try again."
-    }, 500);
+    return json({error:'Unable to prepare checkout. You may retry safely.'},503);
   }
 }
