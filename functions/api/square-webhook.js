@@ -1,4 +1,5 @@
 import { squareConfig } from "../_lib/square.js";
+import { isInvoiceBalance, reconcileBalanceInvoice } from '../_lib/square-balance.js';
 
 function respond(message, status = 200) {
   return new Response(JSON.stringify({ message }), {
@@ -142,8 +143,7 @@ if (
 }
     
 const record = await env.DB.prepare(
-  `SELECT id, amount_cents, currency, status,
-       square_order_id, square_payment_id
+  `SELECT *
    FROM square_payments
    WHERE square_order_id = ?
      AND square_environment = ?
@@ -152,6 +152,11 @@ const record = await env.DB.prepare(
 
 if (!record) {
   return respond("No matching MVBRI deposit");
+}
+
+if (isInvoiceBalance(record)) {
+  const changed = await reconcileBalanceInvoice(env,record);
+  return respond(changed ? 'Verified balance invoice payment recorded' : 'Balance invoice checked');
 }
 
 if (

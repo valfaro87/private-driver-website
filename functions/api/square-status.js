@@ -1,5 +1,6 @@
 import { json, sameOrigin, sha256Hex } from '../_lib/auth.js';
 import { squareConfig, paymentSummary } from '../_lib/square.js';
+import { isInvoiceBalance, reconcileBalanceInvoice } from '../_lib/square-balance.js';
 
 // Customer-initiated verification works behind Cloudflare Access without making
 // a webhook URL public. A redirect or client-supplied status is never proof of payment.
@@ -23,8 +24,9 @@ export async function onRequestPost({request, env}) {
       return json({error:'An active accepted quote is required.'},409);
     }
     if(!Number.isSafeInteger(quote.final_fare_cents) || quote.final_fare_cents<2)return json({error:'Invalid quote amount.'},409);
-    const rows=(await env.DB.prepare(`SELECT id,payment_type,amount_cents,currency,square_order_id,square_environment
-      FROM square_payments WHERE quote_reference=? AND status='pending' LIMIT 2`).bind(quote.reference).all()).results || [];
+    const rows=(await env.DB.prepare(`SELECT * FROM square_payments WHERE quote_reference=?
+      AND (status='pending' OR (payment_type='balance' AND checkout_key LIKE 'mvbri-invoice-balance-%'))
+      LIMIT 2`).bind(quote.reference).all()).results || [];
     const headers={Authorization:`Bearer ${env.SQUARE_ACCESS_TOKEN}`,'Square-Version':'2026-09-16'};
     const get=async(resource,id)=>{
       if(typeof id!=='string' || !/^[a-zA-Z0-9_-]{1,192}$/.test(id))throw new Error('Invalid provider identifier.');
@@ -38,6 +40,10 @@ export async function onRequestPost({request, env}) {
       const deposit=Math.round(quote.final_fare_cents/2);
       const expected=record.payment_type==='deposit'?deposit:quote.final_fare_cents-deposit;
       if(record.amount_cents!==expected)continue;
+      if(isInvoiceBalance(record)) {
+        verified+=await reconcileBalanceInvoice(env,record);
+        continue;
+      }
       const {order}=await get('orders',record.square_order_id);
       if(order?.id!==record.square_order_id || order.location_id!==env.SQUARE_LOCATION_ID)continue;
       for(const tender of (order.tenders || []).slice(0,10)) {

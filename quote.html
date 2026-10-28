@@ -117,12 +117,14 @@
 
     .actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       margin-top: 24px;
     }
 
     button {
       flex: 1;
+      min-width: 150px;
       border: 0;
       border-radius: 8px;
       padding: 14px 12px;
@@ -225,8 +227,10 @@
     Pay 50% Deposit
   </button>
   <button id="payBalanceBtn" type="button" hidden>Pay remaining balance</button>
+  <button id="payReaderBtn" type="button" hidden>Pay balance in person</button>
   <button id="checkPaymentBtn" type="button">Check payment status</button>
 </div>
+      <p id="balancePrivacy" class="notice" hidden>To prepare your balance invoice, MVBRI securely shares your booking name and email with Square. Your card details stay with Square.</p>
       <p id="depositNotice" class="notice">
         After accepting this quote, a 50% deposit is required. The remaining balance is due after your trip.
       </p>
@@ -247,6 +251,8 @@
 const paymentActions = document.getElementById('paymentActions');
 const payDepositBtn = document.getElementById('payDepositBtn');
 const payBalanceBtn = document.getElementById('payBalanceBtn');
+const payReaderBtn = document.getElementById('payReaderBtn');
+const balancePrivacy = document.getElementById('balancePrivacy');
 const checkPaymentBtn = document.getElementById('checkPaymentBtn');
 const paymentInfo = document.getElementById('paymentInfo');
 const depositNotice = document.getElementById('depositNotice');
@@ -257,6 +263,12 @@ function renderPayments(quote) {
     'After accepting this quote, a 50% deposit is required. The remaining balance is due after your trip.' :
     enabled ? payment.balancePaid ?
       'Your ride fare is paid in full. Thank you for choosing MVBRI.' : payment.depositPaid ?
+      payment.balanceNeedsReview ? 'Please contact MVBRI to review the remaining balance before making another payment.' :
+      payment.balanceProcessing ? 'Square is processing your balance payment. Please check payment status before paying again.' :
+      payment.canPayBalance ? !payment.canPayInPerson ?
+        'Your 50% deposit is verified. Use the payment button above to pay the remaining balance online.' : payment.balanceMethod === 'reader' ?
+        'You have chosen to pay the remaining balance in person with the driver’s Square reader. You can also pay the same balance online.' :
+        'Your 50% deposit is verified. Pay the remaining balance online or choose to pay in person with the driver’s Square reader.' :
       'Your 50% deposit has been verified. The remaining balance is due after your trip.' :
       'Your quote is accepted. Please pay the required 50% deposit using the payment button above. The remaining balance is due after your trip.' :
       'Please contact MVBRI if you have questions about your quote or payment arrangements.';
@@ -264,13 +276,18 @@ function renderPayments(quote) {
   paymentActions.hidden = !enabled;
   payDepositBtn.hidden = !enabled || !payment.canPayDeposit;
   payBalanceBtn.hidden = !enabled || !payment.canPayBalance;
+  payReaderBtn.hidden = !enabled || !payment.canPayInPerson;
+  balancePrivacy.hidden = !enabled || !payment.depositPaid || payment.balancePaid;
   const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
   payDepositBtn.textContent = enabled ? 'Pay 50% deposit — ' + money(payment.deposit) : 'Payment unavailable';
   payBalanceBtn.textContent = enabled ? 'Pay remaining balance — ' + money(payment.balance) : 'Payment unavailable';
+  payReaderBtn.textContent = enabled ? 'Pay in person — ' + money(payment.balance) : 'Payment unavailable';
   paymentInfo.textContent = !enabled ? 'Secure payment is unavailable. Please contact MVBRI.' :
     (payment.environment === 'sandbox' ? 'Sandbox test checkout only. No real payment. Test cards only. ' :
      'Secure Square checkout. ' + payment.methods.join(', ') + '. Eligible wallets appear on supported devices. ') +
     (payment.balancePaid ? 'Your fare payments are verified.' : payment.depositPaid ?
+      payment.balanceNeedsReview ? 'Please contact MVBRI about this balance payment.' :
+      payment.balanceProcessing ? 'Square is processing the balance payment.' :
       'Your deposit is verified. The balance is available after trip completion.' :
       'Your 50% deposit will be verified after Square confirms payment.') +
     (enabled && !payment.balancePaid ? ' After checkout, return to this quote and select Check payment status.' : '');
@@ -416,13 +433,16 @@ function renderPayments(quote) {
       }
     }
 
-async function startCheckout(paymentType) {
+let checkoutBusy = false;
+async function startCheckout(paymentType, collectionMethod = 'online') {
+  if (checkoutBusy) return;
   if (currentStatus !== 'accepted') {
     showStatus('Please accept your quote before paying.');
     return;
   }
 
-  payDepositBtn.disabled = payBalanceBtn.disabled = true;
+  checkoutBusy = true;
+  payDepositBtn.disabled = payBalanceBtn.disabled = payReaderBtn.disabled = true;
   showStatus('Preparing your secure checkout…');
 
   try {
@@ -432,7 +452,8 @@ async function startCheckout(paymentType) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
-        paymentType
+        paymentType,
+        collectionMethod
       })
     });
 
@@ -440,6 +461,13 @@ async function startCheckout(paymentType) {
 
     if (!response.ok) {
       showStatus(data.error || 'Unable to prepare payment.');
+      return;
+    }
+
+    if (collectionMethod === 'reader' && data.inPerson === true) {
+      await loadQuote();
+      showStatus('Your remaining balance is ' + new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(data.amount) +
+        '. Pay the driver using their Square reader after your trip. This selection does not charge your card.');
       return;
     }
 
@@ -461,7 +489,8 @@ async function startCheckout(paymentType) {
   } catch {
     showStatus('Unable to connect to Square. Please try again.');
   } finally {
-    payDepositBtn.disabled = payBalanceBtn.disabled = false;
+    checkoutBusy = false;
+    payDepositBtn.disabled = payBalanceBtn.disabled = payReaderBtn.disabled = false;
   }
 }
 
@@ -476,6 +505,8 @@ checkPaymentBtn.addEventListener('click', async () => {
     if(!response.ok)throw new Error(data.error || 'Payment verification is unavailable.');
     await loadQuote();
     showStatus(data.payments?.balancePaid ? 'Your fare payments are verified.' :
+      data.payments?.balanceNeedsReview ? 'Please contact MVBRI to review this balance before another payment.' :
+      data.payments?.balanceProcessing ? 'Square is processing your balance payment. Please check again before paying.' :
       data.payments?.depositPaid ? 'Your deposit is verified.' : 'Square has not confirmed a completed payment yet. Check again after checkout.');
   } catch(error){showStatus(error.message);}
   finally {checkPaymentBtn.disabled=false;}
@@ -483,6 +514,7 @@ checkPaymentBtn.addEventListener('click', async () => {
 
 payDepositBtn.addEventListener('click', () => startCheckout('deposit'));
 payBalanceBtn.addEventListener('click', () => startCheckout('balance'));
+payReaderBtn.addEventListener('click', () => startCheckout('balance','reader'));
 
     acceptBtn.addEventListener('click', () => respond('accept'));
     declineBtn.addEventListener('click', () => respond('decline'));

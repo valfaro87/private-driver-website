@@ -60,6 +60,21 @@
   <p class="privacy">A secure payment provider must be configured for live collection. This starter creates a tip request record and link path; it does not charge a card or process a payment by itself.</p>
 </section> 
   
+<section id="balancesPanel" class="panel hidden">
+  <div class="ref">AFTER TRIP COMPLETION</div>
+  <h2>Remaining ride balances</h2>
+  <p>Collect only the amount left after the verified 50% deposit. Online and in-person payments use the same balance invoice.</p>
+  <div class="field"><label for="balanceQuote">Accepted ride quote</label><select id="balanceQuote"></select></div>
+  <p id="balanceDetails"></p>
+  <div class="actions">
+    <button class="btn ghost" id="refreshBalancesBtn" type="button">Refresh balances</button>
+    <button class="btn" id="prepareBalanceInvoiceBtn" type="button" disabled>Prepare balance for Square reader</button>
+    <button class="btn ghost" id="verifyBalanceInvoiceBtn" type="button" disabled>Check balance payment</button>
+  </div>
+  <p class="privacy">Preparing an invoice securely shares the booking name and email with Square. It does not send a message or charge a card.</p>
+  <div id="balanceStatus" class="status" role="status" aria-live="polite"></div>
+  <div id="balanceReaderInstructions" class="hidden"></div>
+</section>
 <section id="pricingPanel" class="panel hidden">
   <div class="ref">OWNER SETTINGS</div>
   <h2>Ride pricing</h2>
@@ -231,6 +246,7 @@ const mileageResults = new Map();
 const mileagePending = new Map();
 let mileageGeneration = 0;
 let ownerActive = false;
+let balanceEntries = [];
 const mileageKey = b => JSON.stringify([b.reference,b.pickup,b.destination,b.additional_stops,b.trip_type]);
 function updateMileageLine(b, result) {
   mileageResults.set(mileageKey(b), result);
@@ -297,6 +313,14 @@ function showDashboard(show){
     document.getElementById('tipBooking').replaceChildren();
     document.getElementById('quoteBooking').replaceChildren();
     document.getElementById('ownerReviewsList').replaceChildren();
+    balanceEntries=[];
+    document.getElementById('balanceQuote').replaceChildren();
+    document.getElementById('balanceReaderInstructions').replaceChildren();
+    document.getElementById('balanceReaderInstructions').classList.add('hidden');
+    document.getElementById('balanceDetails').textContent='';
+    document.getElementById('balanceStatus').textContent='';
+    document.getElementById('prepareBalanceInvoiceBtn').disabled=true;
+    document.getElementById('verifyBalanceInvoiceBtn').disabled=true;
     document.getElementById('quotePreview').replaceChildren();
     document.getElementById('quoteOwnerNotes').value='';
     document.getElementById('replaceQuoteReference').value='';
@@ -314,6 +338,7 @@ function showDashboard(show){
     .classList.toggle('hidden', !show);
 
   document.getElementById('ownerReviewsPanel').classList.toggle('hidden',!show);
+  document.getElementById('balancesPanel').classList.toggle('hidden',!show);
   if (show) {
     loadOwnerReviews();
     loadPricingSettings();
@@ -553,6 +578,7 @@ const originalLoadBookings = loadBookings;
 loadBookings = async function(){
   await originalLoadBookings();
   updateTipChoices(allBookings);
+  if(ownerActive)await loadOwnerBalances();
 };
 document.getElementById('makeTipLink').addEventListener('click',async()=>{
   const bookingReference=document.getElementById('tipBooking').value;
@@ -1092,6 +1118,93 @@ card.append(
 }
 
 refreshReviewsBtn.addEventListener('click', loadOwnerReviews);
+
+const balanceQuoteSelect=document.getElementById('balanceQuote');
+const balanceDetails=document.getElementById('balanceDetails');
+const balanceStatus=document.getElementById('balanceStatus');
+const balanceInstructions=document.getElementById('balanceReaderInstructions');
+const prepareBalanceButton=document.getElementById('prepareBalanceInvoiceBtn');
+const verifyBalanceButton=document.getElementById('verifyBalanceInvoiceBtn');
+const balanceMoney=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);
+
+function showReaderInstructions(invoiceNumber,amount) {
+  balanceInstructions.replaceChildren();
+  balanceInstructions.append(make('h3','',invoiceNumber+' · '+balanceMoney(amount)+' remaining'));
+  const steps=make('ol');
+  for(const text of [
+    'On your Android device or iPad, open Square Point of Sale → More → Invoices.',
+    'Find invoice '+invoiceNumber+'. Use this invoice for the ride; do not create a separate sale.',
+    'Select Add payment → Remaining amount → Next, choose card payment, and swipe with the connected Square reader.',
+    'After Square confirms the payment, return here and select Check balance payment.'
+  ])steps.append(make('li','',text));
+  balanceInstructions.append(steps,make('p','','Invoice payments require an internet connection. If the customer pays online first, use the invoice’s updated remaining amount.'));
+  balanceInstructions.classList.remove('hidden');
+}
+
+function renderBalanceChoice() {
+  if(!ownerActive)return;
+  balanceInstructions.replaceChildren();balanceInstructions.classList.add('hidden');
+  const item=balanceEntries.find(item=>item.reference===balanceQuoteSelect.value);
+  prepareBalanceButton.disabled=!item?.payments.canPayInPerson;
+  verifyBalanceButton.disabled=!item;
+  if(!item){balanceDetails.textContent='Choose a ride to review its remaining balance.';return;}
+  const p=item.payments;
+  balanceDetails.textContent=item.bookingReference+' · Deposit: '+(p.depositPaid?'verified':'not yet verified')+
+    ' · Remaining balance: '+balanceMoney(p.balance)+
+    (p.balancePaid?' · Fare paid in full.':p.balanceNeedsReview?' · Contact Square/MVBRI before another payment.':
+      p.balanceProcessing?' · Square is processing payment.':!item.tripCompleted?' · Available after trip completion.':'');
+  if(p.balanceInvoiceReady && p.canPayInPerson)showReaderInstructions(item.invoiceNumber,p.balance);
+}
+
+async function loadOwnerBalances() {
+  if(!ownerActive)return;
+  const selected=balanceQuoteSelect.value;
+  try {
+    const result=await api('/api/owner-balances');
+    if(!ownerActive)return;
+    balanceEntries=result.balances || [];
+    balanceQuoteSelect.replaceChildren(make('option','','Choose an accepted ride quote'));
+    balanceQuoteSelect.firstChild.value='';
+    for(const item of balanceEntries) {
+      const option=make('option','',item.reference+' — '+item.name+' — '+balanceMoney(item.payments.balance)+' remaining');
+      option.value=item.reference;balanceQuoteSelect.append(option);
+    }
+    if(balanceEntries.some(item=>item.reference===selected))balanceQuoteSelect.value=selected;
+    renderBalanceChoice();
+  } catch(error) {if(ownerActive)balanceStatus.textContent=error.message;}
+}
+
+balanceQuoteSelect.addEventListener('change',()=>{balanceStatus.textContent='';renderBalanceChoice();});
+document.getElementById('refreshBalancesBtn').addEventListener('click',loadOwnerBalances);
+prepareBalanceButton.addEventListener('click',async()=>{
+  if(!ownerActive || prepareBalanceButton.disabled)return;
+  prepareBalanceButton.disabled=true;verifyBalanceButton.disabled=true;
+  balanceStatus.textContent='Preparing the remaining balance…';
+  try {
+    const result=await api('/api/owner-balances',{method:'POST',body:JSON.stringify({reference:balanceQuoteSelect.value,action:'prepare'})});
+    if(!ownerActive)return;
+    await loadOwnerBalances();
+    if(!ownerActive)return;
+    showReaderInstructions(result.invoiceNumber,result.amount);
+    balanceStatus.textContent='The same balance invoice is ready for the Square reader or online payment. No card has been charged.';
+  } catch(error){if(ownerActive)balanceStatus.textContent=error.message;}
+  finally {if(ownerActive)renderBalanceChoice();}
+});
+verifyBalanceButton.addEventListener('click',async()=>{
+  if(!ownerActive || verifyBalanceButton.disabled)return;
+  verifyBalanceButton.disabled=true;
+  balanceStatus.textContent='Checking the balance with Square…';
+  try {
+    const result=await api('/api/owner-balances',{method:'POST',body:JSON.stringify({reference:balanceQuoteSelect.value,action:'check'})});
+    if(!ownerActive)return;
+    await loadOwnerBalances();
+    if(!ownerActive)return;
+    balanceStatus.textContent=result.payments?.balancePaid ? 'Square verified the remaining balance. The ride fare is paid in full.' :
+      result.payments?.balanceNeedsReview ? 'This balance needs owner review before another payment.' :
+      'Square has not confirmed the full remaining balance yet.';
+  } catch(error){if(ownerActive)balanceStatus.textContent=error.message;}
+  finally {if(ownerActive)renderBalanceChoice();}
+});
 
 // Restore only a server-verified owner session; keep private panels hidden while checking.
 async function restoreOwnerSession() {

@@ -4,7 +4,8 @@ import { sha256Hex } from '../../functions/_lib/auth.js';
 export function database() {
   const sqlite = new DatabaseSync(':memory:');
   for (const file of ['0001_create_bookings.sql','migrations/0002_pricing_and_quotes.sql','0003_additional_stops.sql',
-    '0004_mileage_usage.sql','0005_verified_reviews.sql','0006_square_payments.sql','0007_checkout_retries.sql']) {
+    '0004_mileage_usage.sql','0005_verified_reviews.sql','0006_square_payments.sql','0007_checkout_retries.sql',
+    '0008_balance_invoices.sql']) {
     sqlite.exec(readFileSync(new URL('../../migrations/'+file,import.meta.url),'utf8'));
   }
   const wrap = (sql, values=[]) => ({

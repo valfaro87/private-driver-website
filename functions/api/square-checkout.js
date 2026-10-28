@@ -1,5 +1,6 @@
 import { json, sameOrigin, sha256Hex } from '../_lib/auth.js';
 import { squareConfig, validCheckoutUrl } from '../_lib/square.js';
+import { isInvoiceBalance, prepareBalanceInvoice } from '../_lib/square-balance.js';
 
 export async function onRequestPost({ request, env }) {
   if (!sameOrigin(request)) return json({ error: 'Request rejected.' }, 403);
@@ -20,7 +21,8 @@ export async function onRequestPost({ request, env }) {
   try {
     const hash = await sha256Hex(body.token.toLowerCase());
     const quote = await env.DB.prepare(`SELECT q.reference, q.booking_reference, q.status,
-      q.final_fare_cents, b.status AS booking_status FROM ride_quotes q
+      q.final_fare_cents, b.status AS booking_status, b.name AS customer_name,
+      b.email AS customer_email FROM ride_quotes q
       JOIN bookings b ON b.reference = q.booking_reference WHERE q.customer_token_hash = ? LIMIT 1`)
       .bind(hash).first();
     if (!quote || quote.status !== 'accepted' || ['cancelled','declined'].includes(quote.booking_status)) {
@@ -36,6 +38,16 @@ export async function onRequestPost({ request, env }) {
           paid.amount_cents !== deposit || paid.square_environment !== config.mode) {
         return json({error:'The verified deposit and completed ride are required before balance payment.'},409);
       }
+      const method = body.collectionMethod ?? 'online';
+      if (!['online','reader'].includes(method)) return json({error:'Invalid balance payment method.'},400);
+      const existing = await env.DB.prepare(`SELECT * FROM square_payments
+        WHERE quote_reference=? AND payment_type='balance'`).bind(quote.reference).first();
+      if (!existing || isInvoiceBalance(existing)) {
+        try { return json(await prepareBalanceInvoice(env,quote,method)); }
+        catch (error) { return json({error:error.status ? error.message :
+          'Unable to prepare the balance invoice. Please retry safely.'},error.status || 503); }
+      }
+      if (method === 'reader') return json({error:'This ride already has an online balance checkout. Use that existing checkout; do not create a separate reader charge.'},409);
     }
     const amount = type === 'deposit' ? deposit : total - deposit;
     const now = new Date().toISOString();

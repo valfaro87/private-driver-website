@@ -1,44 +1,45 @@
-# MVBRI upgrade validation — October 25, 2026
+# MVBRI upgrade validation — October 28, 2026
 
-Status: implemented and validated locally against repository base `e9feab2a18a0ae44fd5b7af1d67c5fe0602ebecd`. No GitHub pushes, production deployments, production database migrations, real payments, purchases, customer emails or live route requests were performed. The owner separately restricted preview access and initialized an empty preview database, as described below.
+Production/main remains at `e9feab2a18a0ae44fd5b7af1d67c5fe0602ebecd`. The owner-restricted Cloudflare preview is at `https://mvbri-private-upgrades-20261.private-driver-website.pages.dev/`, using a separate preview database. Existing booking, pricing, expiration, optional tips and review moderation remain intact. Never include customer links, provider tokens or payment details in this report.
 
-## Automated checks
+## Previously verified on the private deployment
 
-`node --test tests/*.test.mjs` — 10 tests passed using synthetic data and in-memory SQLite:
+- Protected synthetic booking submission and automatic route mileage including an additional stop.
+- MVBRI / Owner branding before and after login, restored sessions, and cleared private controls after sign-out.
+- Accepted quote buttons disappear immediately and after reload; private notes stay private.
+- Required 50% deposit wording and no Sandbox notice in live mode.
+- Square Sandbox deposit and balance simulation, exact amounts, completed-trip balance gate and server-side verification.
+- Pending/publish/reply/hide review moderation, consent, single-use invitations and customer field allowlist.
+- Optional tip records persist; tip request links remain informational.
+- Production Square checkout loads the exact synthetic $1 deposit with card, Google Pay and Cash App Pay options. The user confirmed Apple Pay visibility and the MVBRI/$1 payment sheet. Actual authorization has been requested but is not yet verified.
+- Owner review management remains hidden before login and after reload in the private version. The older public version has not yet received that source update.
 
-1. Owner-only route calculations, ordered stops, round-trip return and existing daily cap.
-2. Explicit live-payment activation gate and accurate Sandbox method labels.
-3. Server-derived deposit, stable retry payload, link reuse and premature balance rejection.
-4. Signed provider-verified webhook, signature rejection and duplicate notification handling.
-5. Single quote response, expiry rejection and omission of private owner notes.
-6. Protected owner booking/pricing reads and completed-trip tip eligibility.
-7. Booking request security checks and successful protected submission with ordered stops.
-8. Quote UI eligibility for issued/accepted/declined/expired/cancelled/superseded/unknown states and invalid deadlines.
-9. Review invitation eligibility, one-time submission, publication consent, owner moderation, hiding and public field allowlist.
-10. Private payment-status verification rejects browser claims and wrong amounts, retrieves the stored order/payment, and records a matching completed payment once without requiring a public webhook.
+## Shared reader/online balance changes: local validation
 
-Inline JavaScript syntax checks and `git diff --check` passed. Cloudflare Wrangler 4.152.0 compiled the Pages Functions successfully with no deployment.
+`npm test` — 18 tests passed using synthetic records, in-memory SQLite and mocked providers:
 
-## Browser checks
+- Existing booking security, owner authorization, pricing, quote responses/expiration, reviews, tips and mileage allowance.
+- Explicit live-payment gate, exact server-derived deposit, safe checkout retries and signed webhook verification.
+- Same balance invoice and order for online and reader collection, for fare minus the verified deposit.
+- Owner authentication, same-origin checks, completed ride and matching verified deposit are required.
+- Ambiguous provider responses resume the original idempotent invoice workflow without another balance.
+- Partial reader payments reduce the remaining amount; a verified final online payment settles the same invoice once.
+- Manual paid entries, wrong location/order/currency, uncompleted payments, overpayments and refunds cannot falsely settle a balance.
+- Legacy balance payment links remain usable online and cannot spawn a separate reader charge.
+- Signed reader-payment events reconcile the invoice and remove both payment choices after verified full payment.
 
-Isolated local fixture server; all providers mocked, all customer records synthetic:
+Isolated browser fixture checks passed, with every provider request intercepted:
 
-- Login: exact MVBRI / Owner title and header; private panels hidden.
-- Dashboard: exact branding; two test bookings each automatically show 12.50 miles; pricing, tip controls, quote controls and reviews load.
-- Sign-out: booking nodes, review nodes, tip choices and quote choices are removed.
-- Quote acceptance: Accept/Decline disappear immediately and after reload. The test deposit is exactly $50.01 for a $100.01 quote and is clearly labelled Sandbox.
-- Reviews: a completed-ride invitation opens a verified form; a submitted review stays absent from customer view while pending; the owner-approved synthetic review then appears.
+- A $100.01 quote with a verified $50.01 deposit shows $50.00 for both remaining-balance choices.
+- Choosing in-person payment does not navigate or charge; the owner sees the same invoice number and $50.00 due.
+- Preparing the invoice again preserves that invoice.
+- A simulated completed reader payment, verified through the actual server handler, changes the owner balance to $0.00 and the customer fare to paid in full. Both collection buttons disappear.
+- Sign-out and signed-out navigation hide balance collection and review management.
 
-## Deployment gates still open
+Inline JavaScript syntax and whitespace checks passed. Cloudflare Wrangler 4.152.0 compiled the Pages Functions successfully. No real payment, customer message, purchase or public publication was performed for these balance changes.
 
-The current repository is public and the existing homepage at https://private-driver-website.pages.dev/ is unauthenticated. These were not changed. The new code has not been published. The user's instruction requires private deployment and prohibits unapproved public publishing.
+## Remaining deployment and launch work
 
-The owner is configuring Cloudflare in their own browser because the shared browser could not complete sign-in. Screenshots confirm owner-only Cloudflare Access for previews and a separate empty preview D1 database. Source publication to the existing public GitHub repository still requires explicit approval. Before any production release, verify the live schema, apply additive migration 0007 once, preserve existing data and secrets, and verify owner and customer flows. The production site and main branch remain unchanged.
+Apply additive migration `0008_balance_invoices.sql` to the isolated preview database before deploying the balance changes. Then verify actual Square invoice creation, website checkout and the connected reader on the chosen Android or iPad device. A live payment requires the owner to authorize the exact test amount. The existing $1 live deposit test is still awaiting confirmation. Keep older Sandbox payment records separate from production verification.
 
-Sandbox hosted checkout cannot validate Apple Pay, Google Pay or Cash App Pay. Their code configuration exists, but live activation and production verification are still pending. Existing incomplete legacy checkout attempts are preserved for owner verification. The existing optional tip link remains informational. Mileage remains limited to the previously configured 20 requests per day; records beyond the cap show an unavailable state rather than causing additional requests.
-
-## Subsequent private preview setup
-
-User screenshots confirm that preview URLs are restricted by Cloudflare Access to the owner account email. The user created an isolated empty `mvbri-preview-bookings` D1 database, successfully executed the prepared schema, and bound it as `DB` in Preview only. The owner reports that the Preview environment now has OWNER_PASSWORD, TURNSTILE_SECRET_KEY, GOOGLE_MAPS_API_KEY, SQUARE_ENVIRONMENT=sandbox, SQUARE_ACCESS_TOKEN, and SQUARE_LOCATION_ID saved, plus the BOOKING_RATE_LIMITER binding. The final settings screenshot confirms these variable names, encrypted secrets, Sandbox mode, separate preview DB binding, booking rate limiter binding, and Cloudflare Access protection. Secret contents were not inspected. The exact deployed preview hostname must be added to both TURNSTILE_ALLOWED_HOSTNAMES and the Turnstile widget before a protected booking test. Code publication remains unapproved.
-
-- Additional synthetic browser check: Check payment status authenticated a completed mock payment, marked the deposit verified, and removed the deposit payment button. No real provider requests or customer records were used.
+Before public launch, verify production schema and bindings, apply only missing additive migrations, configure production Square verification and preserve existing customer records. Public source rollout remains pending owner approval. Mileage retains the existing 20-request daily limit. Tips retain the existing optional record/link workflow.

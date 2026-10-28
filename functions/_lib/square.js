@@ -27,17 +27,28 @@ export async function paymentSummary(env, quote) {
   const booking = await env.DB.prepare('SELECT status FROM bookings WHERE reference = ?')
     .bind(quote.booking_reference).first();
   if (!booking || ['cancelled', 'declined'].includes(booking.status)) return { enabled: false };
-  const records = (await env.DB.prepare(`SELECT payment_type, status, square_environment
+  const records = (await env.DB.prepare(`SELECT id, payment_type, status, square_environment, checkout_key
     FROM square_payments WHERE quote_reference = ?`).bind(quote.reference).all()).results || [];
   // Never confuse a simulated payment with a real payment.
   if (records.some(r => r.square_environment !== config.mode)) return { enabled: false };
   const depositPaid = records.some(r => r.payment_type === 'deposit' && r.status === 'paid');
-  const balancePaid = records.some(r => r.payment_type === 'balance' && r.status === 'paid');
+  const balanceRecordedPaid = records.some(r => r.payment_type === 'balance' && r.status === 'paid');
+  const balanceRecord = records.find(r => r.payment_type === 'balance');
+  const invoiceBalance = balanceRecord?.checkout_key?.startsWith('mvbri-invoice-balance-');
+  const invoice = invoiceBalance ? await env.DB.prepare(`SELECT square_invoice_id,invoice_status,preferred_method,review_required,verified_amount_cents
+    FROM square_balance_invoices WHERE payment_id=?`).bind(balanceRecord.id).first() : null;
   const deposit = Math.round(quote.final_fare_cents / 2);
+  const balancePaid = balanceRecordedPaid && !invoice?.review_required;
+  const canPayBalance = depositPaid && booking.status === 'completed' && !balancePaid &&
+    !records.some(r => r.payment_type === 'balance' && r.status !== 'pending') &&
+    !invoice?.review_required && invoice?.invoice_status !== 'PAYMENT_PENDING';
   return { enabled: true, environment: config.mode, methods: config.methods,
     depositPaid, balancePaid, deposit: deposit / 100,
-    balance: (quote.final_fare_cents - deposit) / 100,
+    balance: balancePaid ? 0 : Math.max(0,quote.final_fare_cents - deposit - (invoice?.verified_amount_cents || 0)) / 100,
     canPayDeposit: !depositPaid && !records.some(r => r.payment_type === 'deposit' && r.status !== 'pending'),
-    canPayBalance: depositPaid && booking.status === 'completed' && !balancePaid &&
-      !records.some(r => r.payment_type === 'balance' && r.status !== 'pending') };
+    canPayBalance, canPayInPerson: canPayBalance && (!balanceRecord || !!invoiceBalance),
+    balanceMethod: invoice?.preferred_method || 'online',
+    balanceInvoiceReady: !!invoice?.square_invoice_id,
+    balanceProcessing: invoice?.invoice_status === 'PAYMENT_PENDING',
+    balanceNeedsReview: !!invoice?.review_required || balanceRecord?.status === 'refunded' };
 }

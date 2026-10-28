@@ -14,6 +14,10 @@ Cloudflare Pages Functions and D1 application. The existing public landing page 
 
 ## Payment configuration
 
+New remaining balances use one Square invoice for online payment or in-person card collection. Its amount is the accepted fare minus the verified deposit. In Square Point of Sale, open More → Invoices → the ride's `QT-…-BAL` invoice → Add payment → Remaining amount, then use the connected reader. Use that invoice rather than creating a separate sale. Completed card/wallet payments are verified against its stored order, including partial payments. A manual "mark paid" entry is not treated as a processed card payment. Paid balances hide both payment choices; refunds, overpayments and mismatches require owner review.
+
+Invoice preparation shares only the booking name and email with Square. Route details and private notes are not shared. `SHARE_MANUALLY` delivery sends no automatic invoice email/SMS; automatic card charges and invoice tips are disabled. No paid invoice subscription features are requested. Reader hardware and exact device compatibility require a physical test, with internet available for invoice payments.
+
 Keep credentials in Cloudflare secrets, never this repository or `site-settings.js`:
 
 - `SQUARE_ENVIRONMENT`: retain `sandbox` for development.
@@ -27,7 +31,7 @@ Reference: https://developer.squareup.com/docs/checkout-api/guidelines-and-limit
 
 ## Existing deployment: additive migration only
 
-The deployed application already uses migrations 0001–0006. Verify the live schema before changing it. Apply **`migrations/0007_checkout_retries.sql` once** to add the retry key and exact provider request to `square_payments`. Do not replay the entire migration directory: the inherited repository contains duplicate/nested historical migration files.
+The deployed application already uses migrations 0001–0006. Verify the live schema before changing it. Apply **`migrations/0007_checkout_retries.sql` once** if its two columns are absent, then apply **`migrations/0008_balance_invoices.sql`** for the shared balance-invoice table. Migration 0008 uses `CREATE TABLE IF NOT EXISTS` and is safe to rerun. The private preview already has migration 0007; add only 0008 there. Do not replay the entire migration directory: the inherited repository contains duplicate/nested historical migration files.
 
 The migration does not alter or delete existing bookings, quotes, sessions, reviews, tips or payment records. Existing incomplete legacy checkout records without a saved request must be verified by the owner against Square before retrying; they are deliberately not deleted or reset. Existing completed checkouts are reused. Sandbox and production payment records are never treated as interchangeable; use verified production quotes for a later approved live launch.
 
@@ -37,4 +41,6 @@ Existing bindings remain: `DB`, `OWNER_PASSWORD`, `BOOKING_RATE_LIMITER`, `TURNS
 
 Run `npm test` with Node 24. Tests use in-memory SQLite and synthetic fixtures. Provider calls are mocked, with no live customer data, emails, route charges or payments. Browser checks use a separate isolated fixture server; no QA code or data is deployed.
 
-Before deployment: confirm owner-approved visibility, apply the one additive migration, verify runtime bindings, deploy the reviewed source, and perform signed-in/private smoke tests. Do not call an unauthenticated public URL an owner-private deployment.
+Before deployment: confirm owner-approved visibility, apply the required additive migrations, verify runtime bindings, deploy the reviewed source, and perform signed-in/private smoke tests. Do not call an unauthenticated public URL an owner-private deployment. Preserve the production database, main branch, runtime secrets and visibility until an approved production rollout.
+
+References: https://squareup.com/help/us/en/article/8508-accept-payment-for-an-invoice and https://developer.squareup.com/docs/invoices-api/create-publish-invoices
