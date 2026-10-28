@@ -227,9 +227,8 @@
   <button id="payBalanceBtn" type="button" hidden>Pay remaining balance</button>
   <button id="checkPaymentBtn" type="button">Check payment status</button>
 </div>
-      <p class="notice">
-        Accepting a quote records your response; it does not collect payment.
-        Please contact MVBRI if you have questions about your trip.
+      <p id="depositNotice" class="notice">
+        After accepting this quote, a 50% deposit is required. The remaining balance is due after your trip.
       </p>
     </section>
   </main>
@@ -250,9 +249,17 @@ const payDepositBtn = document.getElementById('payDepositBtn');
 const payBalanceBtn = document.getElementById('payBalanceBtn');
 const checkPaymentBtn = document.getElementById('checkPaymentBtn');
 const paymentInfo = document.getElementById('paymentInfo');
+const depositNotice = document.getElementById('depositNotice');
 function renderPayments(quote) {
   const payment = quote?.payments;
   const enabled = quoteState(quote).canPay && payment?.enabled === true;
+  depositNotice.textContent = quoteState(quote).canRespond ?
+    'After accepting this quote, a 50% deposit is required. The remaining balance is due after your trip.' :
+    enabled ? payment.balancePaid ?
+      'Your ride fare is paid in full. Thank you for choosing MVBRI.' : payment.depositPaid ?
+      'Your 50% deposit has been verified. The remaining balance is due after your trip.' :
+      'Your quote is accepted. Please pay the required 50% deposit using the payment button above. The remaining balance is due after your trip.' :
+      'Please contact MVBRI if you have questions about your quote or payment arrangements.';
   paymentInfo.hidden = !quoteState(quote).canPay;
   paymentActions.hidden = !enabled;
   payDepositBtn.hidden = !enabled || !payment.canPayDeposit;
@@ -365,7 +372,7 @@ function renderPayments(quote) {
       }
 
       const confirmation = action === 'accept'
-        ? 'Do you want to accept this ride quote?'
+        ? 'Accept this ride quote? A 50% deposit is required after acceptance. The remaining balance is due after your trip.'
         : 'Do you want to decline this ride quote?';
 
       if (!confirm(confirmation)) return;
@@ -396,7 +403,9 @@ function renderPayments(quote) {
         await loadQuote();
         showStatus(
           action === 'accept'
-            ? 'Thank you. Your quote acceptance has been recorded. Please contact MVBRI to confirm the ride arrangements.'
+            ? (currentQuote?.payments?.canPayDeposit
+              ? 'Quote accepted. Please pay the required 50% deposit using the payment button below.'
+              : 'Quote accepted. Please review the payment details below.')
             : 'Your decision to decline this quote has been recorded.'
         );
       } catch {
