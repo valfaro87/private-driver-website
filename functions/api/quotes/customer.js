@@ -1,6 +1,8 @@
 
 import { paymentSummary } from "../../_lib/square.js";
 import { json, sameOrigin } from "../../_lib/auth.js";
+import {ensureReceipt,receiptLinks} from '../../_lib/postride.js';
+import {customerOrigin,saveQuoteToken,notificationStatement,wakeCommunications} from '../../_lib/communications.js';
 
 async function getTokenHash(token) {
   const digest = await crypto.subtle.digest(
@@ -100,13 +102,16 @@ export async function onRequestGet({ request, env }) {
     }
 
     quote = await expireIfNeeded(env, quote);
+    await saveQuoteToken(env,quote.reference,token);
 
     let payments = { enabled: false };
     try { payments = await paymentSummary(env, quote); } catch {
       // Payment configuration must never prevent a customer reading a quote.
     }
+    let postride=null;
+    try{const record=await ensureReceipt(env,quote.reference);if(record)postride=await receiptLinks(env,record,customerOrigin(env));}catch{}
     return new Response(
-      JSON.stringify({ quote: { ...publicQuote(quote), payments } }),
+      JSON.stringify({ quote: { ...publicQuote(quote), payments,postride } }),
       {
         status: 200,
         headers: {
@@ -121,7 +126,8 @@ export async function onRequestGet({ request, env }) {
   }
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+  const {request,env}=context;
   if (!env.DB) {
     return json({ error: "Service temporarily unavailable." }, 503);
   }
@@ -183,7 +189,7 @@ export async function onRequestPost({ request, env }) {
 
     // The conditional update prevents two simultaneous responses from
     // both succeeding, and checks the deadline using the database clock.
-    const result = await env.DB.prepare(`
+    const updateStatement = env.DB.prepare(`
       UPDATE ride_quotes
       SET status = ?, responded_at = ?, updated_at = ?
       WHERE reference = ?
@@ -197,7 +203,11 @@ export async function onRequestPost({ request, env }) {
       now,
       quote.reference,
       tokenHash
-    ).run();
+    );
+    const notice=await notificationStatement(env,quote.booking_reference,'quote_response','quote-response:'+quote.reference,
+      {quoteReference:quote.reference,action:newStatus,token},
+      {quoteGuard:{reference:quote.reference,status:newStatus,tokenHash,respondedAt:now}});
+    const [result]=await env.DB.batch([updateStatement,notice].filter(Boolean));
 
     if (result.meta?.changes !== 1) {
       const latest = await findQuote(env, tokenHash);
@@ -213,6 +223,7 @@ export async function onRequestPost({ request, env }) {
       }, 409);
     }
 
+    await wakeCommunications(context);
     return json({
       ok: true,
       quote: {

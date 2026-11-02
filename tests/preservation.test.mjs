@@ -48,3 +48,18 @@ test('booking form still validates protection before storing a new request',asyn
  t.mock.method(globalThis,'fetch',async()=>Response.json({success:true,hostname:'preview.private-driver-website.pages.dev'}));
  assert.equal((await make(body)).status,201);
 });
+
+test('booking verification accepts the MVBRI production domains while preserving the strict preview allowlist',async t=>{
+ const {onRequestPost}=await import('../functions/api/bookings.js');
+ const DB=database(),env={DB,TURNSTILE_SECRET_KEY:'test-only',BOOKING_RATE_LIMITER:{idFromName:x=>x,get:()=>({fetch:async()=>Response.json({allowed:true})})}};
+ let hostname='mvbri.com';
+ t.mock.method(globalThis,'fetch',async()=>Response.json({success:true,hostname}));
+ const body={name:'QA Customer',phone:'5550100000',email:'test@example.invalid',pickup:'QA pickup',destination:'QA destination',date:'2099-01-01',time:'12:00',passengers:'1',trip:'One-way',turnstileToken:'test-only'};
+ const make=()=>{const req=request('/api/bookings',body);req.headers.set('CF-Connecting-IP','192.0.2.1');return onRequestPost({env,request:req});};
+ assert.equal((await make()).status,201);
+ hostname='www.mvbri.com';assert.equal((await make()).status,201);
+ hostname='unrelated.invalid';assert.equal((await make()).status,403);
+ env.TURNSTILE_ALLOWED_HOSTNAMES='preview.private-driver-website.pages.dev';
+ hostname='mvbri.com';assert.equal((await make()).status,403);
+ hostname='preview.private-driver-website.pages.dev';assert.equal((await make()).status,201);
+});

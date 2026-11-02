@@ -1,3 +1,4 @@
+import {wakeCommunications} from '../_lib/communications.js';
 import { json, ownerSession, sameOrigin } from '../_lib/auth.js';
 import { paymentSummary, squareConfig } from '../_lib/square.js';
 import { isInvoiceBalance, prepareBalanceInvoice, reconcileBalanceInvoice } from '../_lib/square-balance.js';
@@ -24,7 +25,8 @@ export async function onRequestGet({request,env}) {
   } catch {return json({error:'Unable to load remaining balances.'},503);}
 }
 
-export async function onRequestPost({request,env}) {
+export async function onRequestPost(context) {
+  const {request,env}=context;
   if(!sameOrigin(request))return json({error:'Request rejected.'},403);
   const rejected = await authorized(request,env); if(rejected)return rejected;
   if(!(request.headers.get('content-type')||'').includes('application/json'))return json({error:'JSON required.'},415);
@@ -47,6 +49,7 @@ export async function onRequestPost({request,env}) {
     const record=await env.DB.prepare(`SELECT * FROM square_payments WHERE quote_reference=? AND payment_type='balance'`)
       .bind(quote.reference).first();
     if(record && isInvoiceBalance(record))await reconcileBalanceInvoice(env,record);
+    await wakeCommunications(context);
     return json({ok:true,payments:await paymentSummary(env,quote)});
   } catch(error) {
     return json({error:error.status ? error.message : 'Unable to prepare or verify the remaining balance.'},error.status || 503);

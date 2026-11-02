@@ -1,3 +1,5 @@
+import {wakeCommunications} from '../_lib/communications.js';
+import {recordTipPayment} from '../_lib/square-tip.js';
 import { squareConfig } from "../_lib/square.js";
 import { isInvoiceBalance, reconcileBalanceInvoice } from '../_lib/square-balance.js';
 
@@ -58,7 +60,8 @@ function equalBytes(a, b) {
   return diff === 0;
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+ const {request,env}=context;
  if (
   !squareConfig(env) ||
   !env.SQUARE_WEBHOOK_SIGNATURE_KEY ||
@@ -151,11 +154,14 @@ const record = await env.DB.prepare(
 ).bind(payment.order_id || "", env.SQUARE_ENVIRONMENT).first();
 
 if (!record) {
-  return respond("No matching MVBRI deposit");
+  const tip=await env.DB.prepare('SELECT * FROM square_tip_checkouts WHERE square_order_id=? AND square_environment=?').bind(payment.order_id||'',env.SQUARE_ENVIRONMENT).first();
+  if(tip){await recordTipPayment(env,tip,payment);return respond('Optional tip payment checked');}
+  return respond("No matching MVBRI payment");
 }
 
 if (isInvoiceBalance(record)) {
   const changed = await reconcileBalanceInvoice(env,record);
+  await wakeCommunications(context);
   return respond(changed ? 'Verified balance invoice payment recorded' : 'Balance invoice checked');
 }
 
@@ -167,8 +173,13 @@ if (
   return respond("Payment details do not match");
 }
 
+if ((payment.refunded_money?.amount || 0)>0) {
+  await env.DB.prepare(`UPDATE square_payments SET status='refunded',updated_at=? WHERE id=? AND square_order_id=? AND square_environment=?`).bind(new Date().toISOString(),record.id,payment.order_id,env.SQUARE_ENVIRONMENT).run();
+  return respond('Refunded payment requires owner review');
+}
 if (record.status === "paid") {
   if (record.square_payment_id === payment.id) {
+    await wakeCommunications(context);
     return respond("Payment already recorded");
   }
 
@@ -213,6 +224,7 @@ const result = await env.DB.prepare(
 if (result.meta?.changes !== 1) {
   return respond("Payment record was not updated", 409);
 }
+   await wakeCommunications(context);
    return respond("Verified payment recorded");
  } catch (error) {
   console.error("Square webhook processing failed:", error?.message);

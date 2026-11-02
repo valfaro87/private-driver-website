@@ -1,10 +1,12 @@
 
 import { json, ownerSession, sameOrigin } from "../../_lib/auth.js";
+import {notificationStatement,quoteTokenStatement,wakeCommunications} from '../../_lib/communications.js';
 
 const clean = (value, max = 500) =>
   String(value ?? "").trim().replace(/\u0000/g, "").slice(0, max);
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+  const {request,env}=context;
   if (!env.DB) {
     return json({ error: "Database unavailable." }, 503);
   }
@@ -96,7 +98,7 @@ export async function onRequestPost({ request, env }) {
       now.getTime() + hours * 60 * 60 * 1000
     ).toISOString();
 
-    const update = await env.DB.prepare(`
+    const updateStatement = env.DB.prepare(`
       UPDATE ride_quotes
       SET
         status = 'issued',
@@ -112,7 +114,12 @@ export async function onRequestPost({ request, env }) {
       expiresAt,
       issuedAt,
       reference
-    ).run();
+    );
+    const notice=await notificationStatement(env,quote.booking_reference,'quote_issued','quote-issued:'+quote.reference,
+      {quoteReference:quote.reference,amount:quote.final_fare_cents/100,expiresAt,token},
+      {quoteGuard:{reference:quote.reference,status:'issued',tokenHash}});
+    const tokenStatement=await quoteTokenStatement(env,quote.reference,token);
+    const [update]=await env.DB.batch([updateStatement,tokenStatement,notice].filter(Boolean));
 
     if (update.meta?.changes !== 1) {
       return json({
@@ -122,10 +129,12 @@ export async function onRequestPost({ request, env }) {
 
     const customerUrl = new URL("/quote.html", request.url);
     customerUrl.searchParams.set("token", token);
+    await wakeCommunications(context);
 
     return json({
       ok: true,
       message: "Quote issued successfully.",
+      notificationQueued:!!notice,
       quote: {
         reference: quote.reference,
         bookingReference: quote.booking_reference,

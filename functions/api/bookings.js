@@ -1,9 +1,11 @@
 import { json, ownerSession, sameOrigin } from "../_lib/auth.js";
+import {validatePreference,preferenceStatement,notificationStatement,wakeCommunications} from '../_lib/communications.js';
 
 const clean = (value, max = 500) =>
   String(value ?? "").trim().replace(/\u0000/g, "").slice(0, max);
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(context) {
+  const {request,env}=context;
   if (!env.DB) {
     return json({ error: "Booking database is not connected yet. Please contact the driver directly." }, 503);
   }
@@ -357,7 +359,7 @@ try {
 
   if (
     !verification.success ||
-    !(env.TURNSTILE_ALLOWED_HOSTNAMES || "private-driver-website.pages.dev")
+    !(env.TURNSTILE_ALLOWED_HOSTNAMES || "private-driver-website.pages.dev,mvbri.com,www.mvbri.com")
       .split(",").map(host => host.trim().toLowerCase()).includes(String(verification.hostname || "").toLowerCase())
   ) {
     return json({
@@ -367,9 +369,11 @@ try {
 
   const reference = "RD-" + crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
   const now = new Date().toISOString();
+  let preference;
+  try {preference=await validatePreference(env,body);}catch(error){return json({error:error.message},error.status||503);}
   try {
    
-    await env.DB.prepare(`
+    const insert=env.DB.prepare(`
       INSERT INTO bookings
       (reference, name, phone, email, pickup, destination, additional_stops,
        pickup_date, pickup_time, passengers, trip_type, notes, status, created_at)
@@ -388,9 +392,12 @@ try {
       booking.trip,
       booking.notes,
       now
-    ).run();
+    );
+    const notice=await notificationStatement(env,reference,'booking_received','booking:'+reference,{},{preference});
+    await env.DB.batch([insert,preferenceStatement(env,reference,preference),notice].filter(Boolean));
+    await wakeCommunications(context);
  
-    return json({ ok: true, reference }, 201);
+    return json({ ok: true, reference,contactPreference:preference.channel }, 201);
   } catch {
     return json({ error: "We could not save your request right now. Please contact the driver directly." }, 500);
   }
@@ -474,7 +481,8 @@ export async function onRequestGet({ request, env }) {
   }
 }
 
-export async function onRequestPatch({ request, env }) {
+export async function onRequestPatch(context) {
+  const {request,env}=context;
   if (!env.DB) return json({ error: "Database is not configured." }, 503);
   if (!sameOrigin(request)) return json({ error: "Request rejected." }, 403);
   if (!await ownerSession(request, env)) return json({ error: "Please sign in as the owner." }, 401);
@@ -506,10 +514,17 @@ export async function onRequestPatch({ request, env }) {
     if (!allowed.includes(status)) {
       return json({ error: "Choose a valid booking status." }, 400);
     }
-    const result = await env.DB.prepare(
-      "UPDATE bookings SET status = ?, updated_at = ? WHERE reference = ?"
-    ).bind(status, new Date().toISOString(), reference).run();
-    if (!result.meta || result.meta.changes === 0) return json({ error: "Booking not found." }, 404);
+    const existing=await env.DB.prepare('SELECT status FROM bookings WHERE reference=?').bind(reference).first();
+    if(!existing)return json({error:'Booking not found.'},404);
+    if(existing.status===status)return json({ok:true,reference,status});
+    const time=new Date().toISOString();
+    const notice=await notificationStatement(env,reference,'booking_status','status:'+reference+':'+time,{status},{bookingGuard:{status,updatedAt:time}});
+    const updates=[env.DB.prepare(
+      "UPDATE bookings SET status = ?, updated_at = ? WHERE reference = ? AND status = ?"
+    ).bind(status,time,reference,existing.status),notice].filter(Boolean);
+    const [result]=await env.DB.batch(updates);
+    if (!result.meta || result.meta.changes === 0) return json({ error: "The booking changed. Refresh before updating it again." }, 409);
+    await wakeCommunications(context);
     return json({ ok: true, reference, status });
   } catch {
     return json({ error: "Could not update the booking." }, 500);

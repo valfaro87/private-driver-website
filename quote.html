@@ -161,10 +161,14 @@
   display: none !important;
 }
   </style>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/favicon.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/branding.css">
 </head>
 <body>
   <header>
-    <h2 class="brand">MVBRI</h2>
+    <h2 class="brand"><img class="brand-logo customer-logo" src="/assets/mvbri-logo.png" alt="MVBRI" width="192" height="128"></h2>
     <p>Private Driver Service · Houston, Texas</p>
   </header>
 
@@ -222,6 +226,7 @@
         <button id="declineBtn" type="button">Decline Quote</button>
       </div>
 <p id="paymentInfo" class="notice" hidden></p>
+<p id="receiptActions" hidden><a class="btn" id="viewReceiptLink">View your receipt</a></p>
 <div id="paymentActions" class="actions" hidden>
   <button id="payDepositBtn" type="button">
     Pay 50% Deposit
@@ -257,6 +262,8 @@ const checkPaymentBtn = document.getElementById('checkPaymentBtn');
 const paymentInfo = document.getElementById('paymentInfo');
 const depositNotice = document.getElementById('depositNotice');
 function renderPayments(quote) {
+  const receiptActions=document.getElementById('receiptActions');receiptActions.hidden=true;
+  if(quote?.postride?.receiptUrl){try{const u=new URL(quote.postride.receiptUrl);if(u.protocol==='https:'&&['www.mvbri.com','mvbri.com','private-driver-website.pages.dev','mvbri-private-upgrades-20261.private-driver-website.pages.dev'].includes(u.hostname)){document.getElementById('viewReceiptLink').href=u.pathname+u.search;receiptActions.hidden=false;}}catch{}}
   const payment = quote?.payments;
   const enabled = quoteState(quote).canPay && payment?.enabled === true;
   depositNotice.textContent = quoteState(quote).canRespond ?

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Private chauffeur and limousine transportation. Request a ride for airport transfers, business travel, and special occasions.">
   <meta name="theme-color" content="#101010">
-  <title>Private Driver | Professional Chauffeur Service</title>
+  <title>MVBRI | Private Driver Service · Houston</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
@@ -86,12 +86,33 @@
     @media(max-width:800px){.hero-grid,.booking-grid,.contact{grid-template-columns:1fr}.hero-grid{padding:65px 0;gap:30px}.hero-card{min-height:240px}.services{grid-template-columns:1fr}.payment-grid{grid-template-columns:repeat(2,1fr)}.navlinks{gap:12px}.navlinks a:not(.btn){display:none}}
     @media(max-width:500px){.wrap{width:min(100% - 28px,1120px)}section{padding:58px 0}form{grid-template-columns:1fr}.field.full,.form-note,.form-submit{grid-column:1}.nav .btn{padding:10px 12px;font-size:10px}.hero-actions .btn{width:100%}}
   </style>
+<script>
+  window.mvbriVerificationError = function(code) {
+    const status = document.getElementById('formStatus');
+    if(status)status.textContent=String(code)==='110200' ?
+      'Booking verification is unavailable for this website address. Please contact MVBRI at (346) 557-5796.' :
+      'Security verification could not load. Please reload this page and try again, or contact MVBRI.';
+    return true;
+  };
+  window.mvbriVerificationExpired = function() {
+    const status=document.getElementById('formStatus');
+    if(status)status.textContent='Security verification expired. Please complete it again before submitting.';
+  };
+  window.mvbriVerificationReady = function() {
+    const status=document.getElementById('formStatus');
+    if(status && /verification/i.test(status.textContent))status.textContent='';
+  };
+</script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/favicon.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/branding.css">
 </head>
 <body>
   <div class="topbar">
     <div class="wrap nav">
-      <a class="brand" href="#home" aria-label="MVBRI">MVBRI</a>
+      <a class="brand" href="#home" aria-label="MVBRI"><img class="brand-logo" src="/assets/mvbri-logo.png" alt="MVBRI" width="156" height="104"></a>
      
 <nav class="navlinks" aria-label="Main navigation">
   <a href="#services">Services</a>
@@ -119,7 +140,7 @@
         </div>
         <aside class="hero-card">
           <div>
-            <div class="monogram">MVBRI</div>
+            <div class="monogram"><img class="brand-logo hero-logo" src="/assets/mvbri-logo.png" alt="MVBRI" width="240" height="160"></div>
             <h3>Private travel, elevated.</h3>
             <p>Personal attention. Clear communication. A service built around your schedule.</p>
           </div>
@@ -166,6 +187,8 @@
             <div class="field"><label for="name">Full name *</label><input id="name" name="name" autocomplete="name" required></div>
             <div class="field"><label for="phone">Phone number *</label><input id="phone" name="phone" type="tel" autocomplete="tel" required></div>
             <div class="field full"><label for="email">Email address *</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+            <div class="field full"><label for="contactPreference">Ride updates (optional)</label><select id="contactPreference" name="contactPreference"><option value="none">No automated updates</option><option value="email" disabled>Email updates</option><option value="sms" disabled>Text message updates</option></select><small id="updateAvailability">Checking available update options…</small></div>
+            <div id="smsConsentWrap" class="field full" hidden><label class="sms-consent"><input id="smsConsent" name="smsConsent" type="checkbox">I agree to receive MVBRI texts about this ride, quotes, payments, and post-ride receipt/optional tip links at the number entered. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not required to request a ride.</label><small><a href="/privacy.html">Privacy</a> · <a href="/messaging-terms.html">Messaging terms</a></small></div>
             <div class="field full"><label for="pickup">Pickup address *</label><input id="pickup" name="pickup" required placeholder="Street address, airport, or landmark"></div>
             <div class="field full"><label for="destination">Destination address *</label><input id="destination" name="destination" required placeholder="Where would you like to go?"></div>
             
@@ -200,7 +223,11 @@
   <div
     class="cf-turnstile"
     data-sitekey="0x4AAAAAAFV68lQ3uIshr5hF"
-    data-theme="dark">
+    data-theme="dark"
+    data-error-callback="mvbriVerificationError"
+    data-expired-callback="mvbriVerificationExpired"
+    data-callback="mvbriVerificationReady"
+    data-retry="never">
   </div>
 </div>
 
@@ -230,7 +257,7 @@
           <div aria-hidden="true" style="font-size:28px;color:var(--gold)">♡</div>
           <div>
             <h3 style="font-size:22px;margin:0 0 8px">Optional gratuity</h3>
-            <p style="font-size:13px;color:#bdb8ae;margin:0">If you enjoyed your ride, tips are always appreciated but never expected. After your trip is completed, you may choose to leave an optional tip using the driver's approved payment method. Tips are entirely voluntary and do not affect the service you receive.</p>
+            <p style="font-size:13px;color:#bdb8ae;margin:0">If you enjoyed your ride, tips are always appreciated but never expected. After your completed ride and verified fare payment, your selected updates include a receipt and an optional tip link. Tips are entirely voluntary and do not affect the service you receive.</p>
           </div>
         </div>
       </div>
@@ -259,6 +286,7 @@
       <span>© <span id="year"></span> <span data-setting="businessName">MVBRI</span>. All rights reserved.</span>
       <span>Professional private transportation</span>
       <p class="privacy">Privacy Notice: MVBRI collects and securely processes information submitted through our ride-request and booking forms to manage reservations, provide quotes, and communicate with customers. Booking information is stored using Cloudflare's database services and is accessible through our protected owner dashboard. Please do not include sensitive personal or financial information in the additional notes field. Public business contact information displayed on this website is visible to visitors.</p>
+      <p><a href="/privacy.html">Privacy notice</a> · <a href="/messaging-terms.html">Ride messaging terms</a></p>
     </div>
   </footer>
   <script src="site-settings.js?v=20261012-2"></script>
@@ -334,6 +362,20 @@
     });
 
 
+    const preferenceSelect=document.getElementById('contactPreference');
+    const smsConsent=document.getElementById('smsConsent');
+    preferenceSelect.addEventListener('change',()=>{
+      const text=preferenceSelect.value==='sms';
+      document.getElementById('smsConsentWrap').hidden=!text;
+      smsConsent.required=text;smsConsent.checked=false;
+    });
+    fetch('/api/communication-options',{cache:'no-store'}).then(r=>r.json()).then(options=>{
+      preferenceSelect.querySelector('[value="email"]').disabled=!options.emailAvailable;
+      preferenceSelect.querySelector('[value="sms"]').disabled=!options.smsAvailable;
+      document.getElementById('updateAvailability').textContent=options.emailAvailable||options.smsAvailable ?
+        'Choose updates for booking, quotes and payments. You can change this choice later.' :
+        'Automatic updates are not available yet. The driver will follow up directly.';
+    }).catch(()=>{document.getElementById('updateAvailability').textContent='The driver will follow up directly.';});
     const dateField = document.getElementById('date');
     dateField.min = new Date().toISOString().split('T')[0];
     document.getElementById('rideForm').addEventListener('submit', async function(e) {
@@ -344,6 +386,7 @@
      
 const d = new FormData(form);
 const payload = Object.fromEntries(d.entries());
+payload.smsConsent = preferenceSelect.value==='sms' && smsConsent.checked;
  
 const additionalStops = d.getAll('additionalStop')
   .map(stop => String(stop).trim());
@@ -386,6 +429,8 @@ status.textContent = 'Submitting your ride request securely…';
         if (!response.ok) throw new Error(result.error || 'Unable to submit the request. Please try again or contact the driver.');
         status.textContent = 'Request received. Your reference is ' + result.reference + '. The driver will contact you to confirm.';
         form.reset();
+      smsConsent.required=false;
+      document.getElementById('smsConsentWrap').hidden=true;
         
 status.textContent = 'Request received. Your reference is ' + result.reference + '. The driver will contact you to confirm.';
 form.reset();

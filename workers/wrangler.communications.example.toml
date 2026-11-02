@@ -1,0 +1,18 @@
+# Create a separate worker; reuse the SAME environment-specific D1 as the Pages site.
+# Keep production and isolated-preview worker names/databases/secrets separate.
+name = "mvbri-preview-communications"
+main = "communications.js"
+compatibility_date = "2026-10-28"
+workers_dev = false
+preview_urls = false
+[triggers]
+crons = ["*/5 * * * *"]
+[vars]
+NOTIFICATION_DELIVERY_MODE = "off"
+CUSTOMER_SITE_URL = "https://mvbri-private-upgrades-20261.private-driver-website.pages.dev"
+[[d1_databases]]
+binding = "DB"
+database_name = "mvbri-preview-bookings"
+database_id = "REPLACE_WITH_PREVIEW_D1_ID"
+# Configure approved delivery/provider secrets privately in Cloudflare.
+# No public HTTP endpoint or browser session is needed by this scheduled worker.
