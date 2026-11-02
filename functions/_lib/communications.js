@@ -127,11 +127,12 @@ export async function drainMessages(env,limit=3){
    const optout=customerOrigin(env)+'/updates.html?ref='+encodeURIComponent(row.booking_reference)+'&token='+await linkToken(env,'updates',row.booking_reference);
    let payload=row.provider_payload_ciphertext?await decryptMessage(env,row.provider_payload_ciphertext):null;
    if(!payload){
-    const text=content.text+(content.links||[]).map(l=>'\n'+l.label+': '+l.url).join('');
+    const messageText=row.channel==='email'?content.text.replace(/^MVBRI:\s*/, ''):content.text;
+    const text=messageText+(content.links||[]).map(l=>'\n'+l.label+': '+l.url).join('');
     payload=row.channel==='sms'?{To:row.destination,From:BUSINESS_PHONE,Body:text+'\nReply STOP to opt out.',StatusCallback:customerOrigin(env)+'/api/message-status?mid='+encodeURIComponent(row.id)}:{
      from:row.sender,to:[row.destination],reply_to:'mvbriofficial@gmail.com',subject:content.subject,
      text:text+'\nManage ride updates: '+optout,
-     html:'<div style="max-width:600px;margin:auto;font-family:Arial,sans-serif"><div style="background:#101010;padding:20px;text-align:center"><img src="cid:mvbri-logo" alt="MVBRI" width="192"></div><h1 style="font-size:24px">'+escape(content.subject)+'</h1><p>'+escape(content.text).replace(/\n/g,'<br>')+'</p>'+(content.links||[]).map(l=>'<p><a href="'+escape(l.url)+'">'+escape(l.label)+'</a></p>').join('')+'<p style="font-size:12px">MVBRI · Houston, Texas · (346) 557-5796<br><a href="'+escape(optout)+'">Manage ride updates</a></p></div>',
+     html:'<div style="max-width:600px;margin:auto;font-family:Arial,sans-serif"><div style="background:#101010;padding:20px;text-align:center"><img src="cid:mvbri-logo" alt="MVBRI" width="192"></div><h1 style="font-size:24px">'+escape(content.subject)+'</h1><p>'+escape(messageText).replace(/\n/g,'<br>')+'</p>'+(content.links||[]).map(l=>'<p><a href="'+escape(l.url)+'">'+escape(l.label)+'</a></p>').join('')+'<p style="font-size:12px">MVBRI · Houston, Texas · (346) 557-5796<br><a href="'+escape(optout)+'">Manage ride updates</a></p></div>',
      attachments:[{content:logoBase64,filename:'mvbri-logo.png',content_type:'image/png',content_id:'mvbri-logo'}]
      ,tags:[{name:'mvbri_message_id',value:row.id}]
     };
