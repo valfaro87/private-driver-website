@@ -11,8 +11,8 @@ export function validInvoiceUrl(value, mode) {
   try {
     const url = new URL(value);
     const hosts = mode === 'sandbox' ? ['squareupsandbox.com', 'www.squareupsandbox.com'] :
-      ['squareup.com', 'www.squareup.com'];
-    return url.protocol === 'https:' && !url.username && !url.password && hosts.includes(url.hostname) &&
+      ['squareup.com', 'www.squareup.com', 'app.squareup.com'];
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port && hosts.includes(url.hostname) &&
       (url.pathname.startsWith('/pay-invoice/') || url.pathname.startsWith('/u/'));
   } catch { return false; }
 }

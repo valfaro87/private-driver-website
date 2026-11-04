@@ -6,6 +6,7 @@ import { onRequestPost as check } from '../functions/api/square-status.js';
 import { onRequestGet as ownerGet,onRequestPost as ownerPost } from '../functions/api/owner-balances.js';
 import { onRequestPost as webhook } from '../functions/api/square-webhook.js';
 import { paymentSummary } from '../functions/_lib/square.js';
+import { validInvoiceUrl } from '../functions/_lib/square-balance.js';
 
 async function ready(DB) {
   await fixture(DB);
@@ -15,13 +16,13 @@ async function ready(DB) {
     ('QT-TEST000001','RD-TEST000001','deposit',5001,'paid','sandbox','deposit-paid','now','now')`).run();
 }
 
-function provider(t) {
+function provider(t, invoiceUrl='https://squareupsandbox.com/pay-invoice/inv:0-test') {
   const calls=[], saved=new Map();
   let status='UNPAID', paid=0, state='OPEN', payments=[], refund=0;
   let loseOrderResponse=false, orderResponseLost=false;
   const invoice=()=>({id:'inv:0-test',version:1,location_id:'test-location',order_id:'balance-order',
     primary_recipient:{customer_id:'balance-customer'},status,
-    public_url:'https://squareupsandbox.com/pay-invoice/inv:0-test',
+    public_url:invoiceUrl,
     payment_requests:[{computed_amount_money:{amount:5000,currency:'USD'},
       total_completed_amount_money:{amount:paid,currency:'USD'}}]});
   t.mock.method(globalThis,'fetch',async(url,options={})=>{
@@ -56,6 +57,30 @@ function provider(t) {
 const customer=(env,method='online')=>checkout({env,request:request('/api/square-checkout',{
   token:testToken,paymentType:'balance',collectionMethod:method,amount:1})});
 const status=env=>check({env,request:request('/api/square-status',{token:testToken,status:'paid'})});
+
+test('production reader and online checkout reuse the official app.squareup.com invoice link and reject unsafe redirects',async t=>{
+  const DB=database();await ready(DB);
+  await DB.prepare(`UPDATE square_payments SET square_environment='production' WHERE payment_type='deposit'`).run();
+  const env={...squareEnv(DB),SQUARE_ENVIRONMENT:'production',SQUARE_LIVE_PAYMENTS_APPROVED:'true'};
+  const invoiceUrl='https://app.squareup.com/pay-invoice/invtmp:production-test';
+  const p=provider(t,invoiceUrl);
+  const reader=await customer(env,'reader');assert.equal(reader.status,200);
+  const first=await reader.json();assert.equal(first.checkoutUrl,invoiceUrl);assert.equal(first.inPerson,true);
+  const online=await customer(env);assert.equal(online.status,200);
+  assert.equal((await online.json()).checkoutUrl,invoiceUrl);
+  assert.equal(p.calls.filter(call=>call.path==='/v2/invoices').length,1);
+  assert.equal(p.calls.filter(call=>call.path==='/v2/orders').length,1);
+  assert.equal(validInvoiceUrl(invoiceUrl,'sandbox'),false);
+  for(const unsafe of [
+    'http://app.squareup.com/pay-invoice/invtmp:test',
+    'https://app.squareup.com.evil.invalid/pay-invoice/invtmp:test',
+    'https://squareup.com@evil.invalid/pay-invoice/invtmp:test',
+    'https://user:password@app.squareup.com/pay-invoice/invtmp:test',
+    'https://app.squareup.com:8443/pay-invoice/invtmp:test',
+    'https://app.squareup.com/dashboard',
+    'https://squareupsandbox.com/pay-invoice/invtmp:test'
+  ])assert.equal(validInvoiceUrl(unsafe,'production'),false,unsafe);
+});
 
 test('online and reader use one balance invoice for fare minus verified deposit, with no automatic messages or charges',async t=>{
   const DB=database();await ready(DB);const env=squareEnv(DB), p=provider(t);
