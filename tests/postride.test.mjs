@@ -78,6 +78,27 @@ test('optional tip is verified from its matching Square payment, remains separat
  refunded=1000;assert.equal((await(await post('check')).json()).status,'refunded');
 });
 
+test('a tip above $500 reaches Square as exact cents while invalid amounts leave the checkout unused', async t => {
+ const {DB,env} = await setup();
+ const auth = credentials(await ready(env));
+ const amounts = [];
+ t.mock.method(globalThis, 'fetch', async (url, options) => {
+  assert.ok(String(url).endsWith('/online-checkout/payment-links'));
+  amounts.push(JSON.parse(options.body).quick_pay.price_money.amount);
+  return Response.json({payment_link:{id:'higher-tip-link',order_id:'higher-tip-order',url:'https://sandbox.square.link/u/higher-tip'}});
+ });
+ const post = amount => tipPost({env,request:request('/api/tip-checkout',{...auth,action:'checkout',amount})});
+ for (const invalid of [0.99, 1.001, 50_000.01]) {
+  assert.equal((await post(invalid)).status, 400);
+ }
+ assert.equal((await DB.prepare('SELECT COUNT(*) AS count FROM square_tip_checkouts').first()).count, 0);
+ const result = await post(501.25);
+ assert.equal(result.status, 200);
+ assert.equal((await result.json()).amount, 501.25);
+ assert.equal((await post(501.25)).status, 200);
+ assert.deepEqual(amounts, [50_125]);
+});
+
 test('scheduled job verifies payment without a customer return, sends receipt, expires quotes, and never exposes an HTTP job endpoint',async t=>{
  const {DB,env}=await setup();await payment(DB,'deposit');await payment(DB,'balance','pending');await DB.prepare(`UPDATE bookings SET status='completed'`).run();let messages=[];
  t.mock.method(globalThis,'fetch',async(url,options)=>{

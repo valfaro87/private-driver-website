@@ -1,9 +1,14 @@
 import {squareConfig,validCheckoutUrl} from './square.js';
 const problem=(message,status=409)=>Object.assign(new Error(message),{status});
+// This is Square's U.S. single-transaction limit, not an MVBRI gratuity limit.
+const squareUsdTransactionLimitCents = 5_000_000;
 export async function prepareTipCheckout(env,reference,amount){
  const config=squareConfig(env);if(!config)throw problem('Optional tips are not available yet.',503);
+ const amountError='Enter a tip of $1 or more, using up to two decimal places.';
+ if(typeof amount!=='number'||!Number.isFinite(amount)||amount<1)throw problem(amountError,400);
  const cents=Math.round(amount*100);
- if(typeof amount!=='number'||!Number.isFinite(amount)||Math.abs(amount*100-cents)>0.000001||cents<100||cents>50000)throw problem('Choose an optional tip between $1 and $500, with no more than two decimal places.',400);
+ if(amount>squareUsdTransactionLimitCents/100)throw problem('This amount exceeds Square’s single-payment limit. Enter a smaller tip.',400);
+ if(Math.abs(amount*100-cents)>0.000001)throw problem(amountError,400);
  const time=new Date().toISOString(),key='mvbri-tip-v1-'+reference;
  const payload=JSON.stringify({idempotency_key:key,quick_pay:{name:'MVBRI Optional Gratuity',price_money:{amount:cents,currency:'USD'},location_id:env.SQUARE_LOCATION_ID},checkout_options:{allow_tipping:false,ask_for_shipping_address:false,accepted_payment_methods:{apple_pay:config.mode==='production',google_pay:config.mode==='production',cash_app_pay:config.mode==='production',afterpay_clearpay:false}}});
  await env.DB.prepare(`INSERT OR IGNORE INTO square_tip_checkouts(quote_reference,amount_cents,square_environment,checkout_key,checkout_request,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`).bind(reference,cents,config.mode,key,payload,time,time).run();
