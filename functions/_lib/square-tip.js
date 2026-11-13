@@ -1,8 +1,10 @@
 import {squareConfig,validCheckoutUrl} from './square.js';
+import {isPayPalSandboxQuote} from './paypal-config.js';
 const problem=(message,status=409)=>Object.assign(new Error(message),{status});
 // This is Square's U.S. single-transaction limit, not an MVBRI gratuity limit.
 const squareUsdTransactionLimitCents = 5_000_000;
 export async function prepareTipCheckout(env,reference,amount){
+ if(isPayPalSandboxQuote(env,reference))throw problem('Square tip checkout is unavailable for this sandbox test ride.');
  const config=squareConfig(env);if(!config)throw problem('Optional tips are not available yet.',503);
  const amountError='Enter a tip of $1 or more, using up to two decimal places.';
  if(typeof amount!=='number'||!Number.isFinite(amount)||amount<1)throw problem(amountError,400);

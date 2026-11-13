@@ -1,4 +1,5 @@
 import { squareConfig } from './square.js';
+import { isPayPalSandboxQuote } from './paypal-config.js';
 
 export const isInvoiceBalance = record => record?.payment_type === 'balance' &&
   record.checkout_key?.startsWith('mvbri-invoice-balance-');
@@ -57,6 +58,7 @@ function checkInvoice(invoice, record, entry, env) {
 export async function prepareBalanceInvoice(env, quote, method = 'online') {
   const config = squareConfig(env);
   if (!config || !env.DB) fail('Secure balance collection is not configured.', 503);
+  if (isPayPalSandboxQuote(env, quote.reference)) fail('This is a PayPal sandbox test quote.');
   if (!['online', 'reader'].includes(method)) fail('Choose a valid balance payment method.', 400);
   if (quote.status !== 'accepted' || quote.booking_status !== 'completed' ||
       !Number.isSafeInteger(quote.final_fare_cents) || quote.final_fare_cents < 2) {

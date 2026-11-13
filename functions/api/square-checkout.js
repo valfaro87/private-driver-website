@@ -1,6 +1,7 @@
 import { json, sameOrigin, sha256Hex } from '../_lib/auth.js';
 import { squareConfig, validCheckoutUrl } from '../_lib/square.js';
 import { isInvoiceBalance, prepareBalanceInvoice } from '../_lib/square-balance.js';
+import { isPayPalPayment, isPayPalSandboxQuote } from '../_lib/paypal-config.js';
 
 export async function onRequestPost({ request, env }) {
   if (!sameOrigin(request)) return json({ error: 'Request rejected.' }, 403);
@@ -28,6 +29,7 @@ export async function onRequestPost({ request, env }) {
     if (!quote || quote.status !== 'accepted' || ['cancelled','declined'].includes(quote.booking_status)) {
       return json({ error: 'An active accepted quote is required.' }, 409);
     }
+    if (isPayPalSandboxQuote(env, quote.reference)) return json({error:'This is a PayPal sandbox test quote.'},409);
     const total = quote.final_fare_cents;
     if (!Number.isSafeInteger(total) || total < 2) return json({ error: 'Invalid quote amount.' }, 400);
     const deposit = Math.round(total / 2);
@@ -67,6 +69,7 @@ export async function onRequestPost({ request, env }) {
     const load = () => env.DB.prepare(`SELECT * FROM square_payments WHERE quote_reference = ? AND payment_type = ?`)
       .bind(quote.reference,type).first();
     const record = await load();
+    if (isPayPalPayment(record)) return json({error:'Use the existing PayPal or Venmo checkout.'},409);
     if (!record || record.amount_cents !== amount || record.currency !== 'USD' || record.square_environment !== config.mode) {
       return json({error:'Payment record does not match this quote. Please contact MVBRI.'},409);
     }

@@ -2,14 +2,15 @@ import { json, sameOrigin, sha256Hex } from '../_lib/auth.js';
 import { squareConfig, paymentSummary } from '../_lib/square.js';
 import {verifyQuotePayments} from '../_lib/square-reconcile.js';
 import {wakeCommunications} from '../_lib/communications.js';
+import { paypalConfig } from '../_lib/paypal-config.js';
+import { verifyPayPalPayments } from '../_lib/paypal.js';
 
 // Customer-initiated verification works behind Cloudflare Access without making
 // a webhook URL public. A redirect or client-supplied status is never proof of payment.
 export async function onRequestPost(context) {
   const {request,env}=context;
   if (!sameOrigin(request)) return json({error:'Request rejected.'},403);
-  const config=squareConfig(env);
-  if (!env.DB || !config) return json({error:'Payment verification is not configured.'},503);
+  if (!env.DB) return json({error:'Payment verification is not configured.'},503);
   if (!(request.headers.get('content-type') || '').includes('application/json')) return json({error:'JSON required.'},415);
   let body;
   try {
@@ -26,7 +27,10 @@ export async function onRequestPost(context) {
       return json({error:'An active accepted quote is required.'},409);
     }
     if(!Number.isSafeInteger(quote.final_fare_cents) || quote.final_fare_cents<2)return json({error:'Invalid quote amount.'},409);
-    const verified=await verifyQuotePayments(env,quote);
+    if (!squareConfig(env) && !paypalConfig(env, quote.reference)) {
+      return json({error:'Payment verification is not configured.'},503);
+    }
+    const verified = await verifyQuotePayments(env, quote) + await verifyPayPalPayments(env, quote);
     await wakeCommunications(context);
     return json({ok:true,verified,payments:await paymentSummary(env,quote)});
   } catch {return json({error:'Unable to verify payment right now. Please try again later.'},502);}

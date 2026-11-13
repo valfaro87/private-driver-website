@@ -1149,7 +1149,8 @@ function renderBalanceChoice() {
   balanceDetails.textContent=item.bookingReference+' · Deposit: '+(p.depositPaid?'verified':'not yet verified')+
     ' · Remaining balance: '+balanceMoney(p.balance)+
     (p.balancePaid?' · Fare paid in full.':p.balanceNeedsReview?' · Contact Square/MVBRI before another payment.':
-      p.balanceProcessing?' · Square is processing payment.':!item.tripCompleted?' · Available after trip completion.':'');
+      p.balanceProcessing?' · Payment is processing.':p.balanceViaPayPal?' · PayPal or Venmo checkout started.':
+      !item.tripCompleted?' · Available after trip completion.':'');
   if(p.balanceInvoiceReady && p.canPayInPerson)showReaderInstructions(item.invoiceNumber,p.balance);
 }
 
@@ -1190,15 +1191,15 @@ prepareBalanceButton.addEventListener('click',async()=>{
 verifyBalanceButton.addEventListener('click',async()=>{
   if(!ownerActive || verifyBalanceButton.disabled)return;
   verifyBalanceButton.disabled=true;
-  balanceStatus.textContent='Checking the balance with Square…';
+  balanceStatus.textContent='Checking the remaining balance…';
   try {
     const result=await api('/api/owner-balances',{method:'POST',body:JSON.stringify({reference:balanceQuoteSelect.value,action:'check'})});
     if(!ownerActive)return;
     await loadOwnerBalances();
     if(!ownerActive)return;
-    balanceStatus.textContent=result.payments?.balancePaid ? 'Square verified the remaining balance. The ride fare is paid in full.' :
+    balanceStatus.textContent=result.payments?.balancePaid ? 'The remaining balance is verified. The ride fare is paid in full.' :
       result.payments?.balanceNeedsReview ? 'This balance needs owner review before another payment.' :
-      'Square has not confirmed the full remaining balance yet.';
+      'The full remaining balance has not been confirmed yet.';
   } catch(error){if(ownerActive)balanceStatus.textContent=error.message;}
   finally {if(ownerActive)renderBalanceChoice();}
 });

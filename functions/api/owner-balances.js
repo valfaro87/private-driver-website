@@ -2,9 +2,13 @@ import {wakeCommunications} from '../_lib/communications.js';
 import { json, ownerSession, sameOrigin } from '../_lib/auth.js';
 import { paymentSummary, squareConfig } from '../_lib/square.js';
 import { isInvoiceBalance, prepareBalanceInvoice, reconcileBalanceInvoice } from '../_lib/square-balance.js';
+import { verifyPayPalPayments } from '../_lib/paypal.js';
+import { paypalConfig } from '../_lib/paypal-config.js';
 
 async function authorized(request,env) {
-  if (!env.DB || !squareConfig(env)) return json({error:'Balance payments are not configured.'},503);
+  if (!env.DB || !(squareConfig(env) || paypalConfig(env, env.PAYPAL_SANDBOX_TEST_QUOTE))) {
+    return json({error:'Balance payments are not configured.'},503);
+  }
   if (!await ownerSession(request,env)) return json({error:'Please sign in as the owner.'},401);
 }
 
@@ -49,6 +53,7 @@ export async function onRequestPost(context) {
     const record=await env.DB.prepare(`SELECT * FROM square_payments WHERE quote_reference=? AND payment_type='balance'`)
       .bind(quote.reference).first();
     if(record && isInvoiceBalance(record))await reconcileBalanceInvoice(env,record);
+    await verifyPayPalPayments(env, quote, 'balance');
     await wakeCommunications(context);
     return json({ok:true,payments:await paymentSummary(env,quote)});
   } catch(error) {
