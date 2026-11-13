@@ -22,10 +22,17 @@ export async function receiptLinks(env,record,origin){
  const suffix='?ref='+encodeURIComponent(record.quote_reference)+'&token='+token;
  return {receiptUrl:origin+'/receipt.html'+suffix,tipUrl:origin+'/tip.html'+suffix};
 }
-export async function authorizedReceipt(env,reference,token){
+export async function receiptReviewLink(env,record,origin){
+ const token=await linkToken(env,'postride-review',record.quote_reference+':'+record.nonce);
+ const url=new URL('/review.html',origin);
+ url.searchParams.set('ref',record.quote_reference);
+ url.searchParams.set('token',token);
+ return url.toString();
+}
+export async function authorizedReceipt(env,reference,token,purpose='postride'){
  if(!hasCommunicationsKey(env)||!/^QT-[A-Z0-9]{8,32}$/.test(reference||'')||!/^[a-f0-9]{64}$/i.test(token||''))return null;
  const record=await env.DB.prepare('SELECT * FROM postride_receipts WHERE quote_reference=?').bind(reference).first();
- if(!record||!equalText(token,await linkToken(env,'postride',record.quote_reference+':'+record.nonce)))return null;
+ if(!record||!equalText(token,await linkToken(env,purpose,record.quote_reference+':'+record.nonce)))return null;
  const fare=await fareState(env,reference);if(!fare?.fullyPaid)return null;
  return {record,fare};
 }
@@ -37,6 +44,14 @@ export async function queuePaymentNotices(env,notificationStatement,origin,limit
  for(const q of rows){
   const fare=await fareState(env,q.reference);if(!fare||['declined','cancelled'].includes(fare.booking_status))continue;
   if(fare.depositPaid){const notice=await notificationStatement(env,fare.booking_reference,'deposit_paid','deposit:'+q.reference,{amount:fare.depositCents/100});if(notice)await notice.run();}
-  if(fare.fullyPaid){const record=await ensureReceipt(env,q.reference),links=await receiptLinks(env,record,origin);const notice=await notificationStatement(env,fare.booking_reference,'receipt','receipt:'+q.reference,{total:fare.final_fare_cents/100,...links});if(notice)await notice.run();}
+  if(fare.fullyPaid){
+   const record=await ensureReceipt(env,q.reference);
+   if(!record)continue;
+   const links=await receiptLinks(env,record,origin);
+   const existingReview=await env.DB.prepare('SELECT id FROM customer_reviews WHERE booking_reference=?').bind(fare.booking_reference).first();
+   const reviewUrl=existingReview?undefined:await receiptReviewLink(env,record,origin);
+   const notice=await notificationStatement(env,fare.booking_reference,'receipt','receipt:'+q.reference,{total:fare.final_fare_cents/100,...links,reviewUrl});
+   if(notice)await notice.run();
+  }
  }
 }

@@ -1,26 +1,25 @@
-import { sameOrigin } from "../_lib/auth.js";
+import { json, sameOrigin, sha256Hex } from "../_lib/auth.js";
+import { authorizedReceipt } from "../_lib/postride.js";
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff"
-    }
-  });
+async function receiptInvitation(env, reference, token) {
+  const ride = typeof reference === 'string'
+    ? await authorizedReceipt(env, reference, token, 'postride-review')
+    : null;
+  if (!ride) return { error: 'This review link requires a completed, fully paid ride.', status: 404 };
+  const { booking_reference: bookingReference } = ride.fare;
+  const existing = await env.DB.prepare('SELECT id FROM customer_reviews WHERE booking_reference = ?')
+    .bind(bookingReference).first();
+  if (existing) return { error: 'A review has already been submitted.', status: 409 };
+  return { bookingReference };
 }
 
-function bytesToHex(bytes) {
-  return Array.from(bytes, byte =>
-    byte.toString(16).padStart(2, "0")
-  ).join("");
-}
-
-async function hashToken(token) {
-  const encoded = new TextEncoder().encode(token);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return bytesToHex(new Uint8Array(digest));
+function submitted(permission) {
+  return json({
+    success: true,
+    message: permission
+      ? 'Thank you! MVBRI will review your feedback before publishing it.'
+      : 'Thank you! Your feedback will be visible to the owner only.'
+  }, 201);
 }
 
 // Validate a review invitation before displaying the form.
@@ -38,7 +37,12 @@ export async function onRequestGet({ request, env }) {
   }
 
   try {
-    const tokenHash = await hashToken(token);
+    if (url.searchParams.has('ref')) {
+      const invitation = await receiptInvitation(env, url.searchParams.get('ref'), token);
+      if (invitation.error) return json({ valid: false, error: invitation.error }, invitation.status);
+      return json({ valid: true, message: 'Your review invitation is valid.' });
+    }
+    const tokenHash = await sha256Hex(token);
 
     const invitation = await env.DB.prepare(`
       SELECT
@@ -164,7 +168,21 @@ export async function onRequestPost({ request, env }) {
   }
 
   try {
-    const tokenHash = await hashToken(token);
+    if (body.reference !== undefined) {
+      const invitation = await receiptInvitation(env, body.reference, token);
+      if (invitation.error) return json({ error: invitation.error }, invitation.status);
+      const result = await env.DB.prepare(`
+        INSERT INTO customer_reviews (
+          booking_reference, customer_name, rating, feedback, permission_to_publish, moderation_status
+        )
+        SELECT reference, ?, ?, ?, ?, 'pending' FROM bookings
+        WHERE reference = ? AND status = 'completed'
+        ON CONFLICT(booking_reference) DO NOTHING
+      `).bind(name, rating, feedback, permission, invitation.bookingReference).run();
+      if (result.meta?.changes !== 1) return json({ error: 'This invitation cannot be used.' }, 409);
+      return submitted(permission);
+    }
+    const tokenHash = await sha256Hex(token);
 
     // Check eligibility without revealing booking details.
     const invitation = await env.DB.prepare(`
@@ -260,10 +278,7 @@ export async function onRequestPost({ request, env }) {
       }, 409);
     }
 
-    return json({
-      success: true,
-      message: "Thank you! Your review has been submitted."
-    }, 201);
+    return submitted(permission);
 
   } catch (error) {
     console.error("Review submission failed:", error);

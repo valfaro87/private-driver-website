@@ -6,6 +6,9 @@ import {processCommunications} from '../functions/_lib/communications.js';
 import {onRequestGet as receiptGet} from '../functions/api/ride-receipt.js';
 import {onRequestPost as tipPost} from '../functions/api/tip-checkout.js';
 import {onRequestPost as verifyPayment} from '../functions/api/square-status.js';
+import {onRequestGet as verifyReview, onRequestPost as submitReview} from '../functions/api/review-submit.js';
+import {onRequestPost as moderateReview} from '../functions/api/owner-reviews.js';
+import {onRequestGet as publicReviews} from '../functions/api/reviews.js';
 import worker,{runCommunicationJob} from '../workers/communications.js';
 import {encryptMessage} from '../functions/_lib/communications-crypto.js';
 
@@ -33,13 +36,62 @@ test('receipt and optional-tip message follows completed ride plus provider-veri
  assert.equal(emails.length,1);assert.match(emails[0].text,/deposit/);assert.equal(await ensureReceipt(env,'QT-TEST000001'),null);
  await DB.prepare(`UPDATE bookings SET status='completed'`).run();await processCommunications(env);assert.equal(emails.length,1);
  assert.equal((await verifyPayment({env,request:request('/api/square-status',{token:testToken})})).status,200);
- assert.equal(emails.length,2);assert.match(emails[1].text,/receipt.html/);assert.match(emails[1].text,/tip.html/);assert.equal(emails[1].attachments[0].content_id,'mvbri-logo');
+ assert.equal(emails.length,2);assert.match(emails[1].text,/receipt.html/);assert.match(emails[1].text,/tip.html/);assert.match(emails[1].text,/review.html/);assert.equal(emails[1].attachments[0].content_id,'mvbri-logo');
  await processCommunications(env);assert.equal(emails.length,2);
  const record=await ensureReceipt(env,'QT-TEST000001'),links=await receiptLinks(env,record,env.CUSTOMER_SITE_URL),auth=credentials(links);
  const result=await receiptGet({env,request:request('/api/ride-receipt?'+new URLSearchParams({ref:auth.reference,token:auth.token}))});assert.equal(result.status,200);const body=await result.json();
  assert.equal(body.fare,100.01);assert.equal(body.deposit,50.01);assert.equal(body.balancePaid,50);for(const key of ['name','email','phone','pickup','destination','owner_notes'])assert.equal(body[key],undefined);
  assert.equal((await receiptGet({env,request:request('/api/ride-receipt?ref='+auth.reference+'&token='+'0'.repeat(64))})).status,404);
  assert.equal(JSON.stringify((await DB.prepare('SELECT * FROM postride_receipts').all()).results).includes(auth.token),false);
+});
+
+test('receipt email review links verify full fare, accept one review per ride, and respect both visibility choices', async t => {
+ for (const permission of [false,true]) {
+  await t.test(permission ? 'allow publication' : 'keep private', async t => {
+   const {DB,env} = await setup();
+   const emails = [];
+   t.mock.method(globalThis,'fetch',async (url,options) => {
+    assert.equal(url,'https://api.resend.com/emails');
+    emails.push(JSON.parse(options.body));
+    return Response.json({id:'review-email-'+emails.length});
+   });
+   const links = await ready(env);
+   await runCommunicationJob(env);
+   await runCommunicationJob(env);
+   const receipts = emails.filter(x => x.subject === 'Your MVBRI receipt');
+   assert.equal(receipts.length,1);
+   const message = receipts[0];
+   const reviewUrl = new URL(message.text.match(/Leave an optional review: (https:\/\/[^\s]+)/)[1]);
+   assert.equal(reviewUrl.pathname,'/review.html');
+   assert.match(message.html,/Leave an optional review/);
+   assert.match(message.text,/View your receipt/);
+   assert.match(message.text,/Leave an optional tip/);
+   const auth = {reference:reviewUrl.searchParams.get('ref'),token:reviewUrl.searchParams.get('token')};
+   const receiptAuth = credentials(links);
+   assert.equal(auth.reference,receiptAuth.reference);
+   assert.notEqual(auth.token,receiptAuth.token);
+   const query = (token = auth.token) => '?'+new URLSearchParams({ref:auth.reference,token});
+   const verify = token => verifyReview({env,request:request('/api/review-submit'+query(token))});
+   const body = {...auth,customer_name:'Test rider',rating:5,feedback:'Test feedback',permission_to_publish:permission};
+   const submit = () => submitReview({env,request:request('/api/review-submit',body)});
+   assert.equal((await verify(receiptAuth.token)).status,404);
+   assert.equal((await receiptGet({env,request:request('/api/ride-receipt'+query())})).status,404);
+   assert.equal((await verify()).status,200);
+   await DB.prepare("UPDATE square_payments SET status='refunded' WHERE payment_type='balance'").run();
+   assert.equal((await verify()).status,404);
+   assert.equal((await submit()).status,404);
+   await DB.prepare("UPDATE square_payments SET status='paid' WHERE payment_type='balance'").run();
+   const submissions = await Promise.all([submit(),submit()]);
+   assert.deepEqual(submissions.map(x=>x.status).sort(),[201,409]);
+   assert.equal((await verify()).status,409);
+   const review = await DB.prepare('SELECT id,permission_to_publish FROM customer_reviews').first();
+   assert.equal(review.permission_to_publish,Number(permission));
+   assert.equal((await (await publicReviews({env})).json()).reviews.length,0);
+   const approve = await moderateReview({env,request:request('/api/owner-reviews',{review_id:review.id,action:'publish'},true)});
+   assert.equal(approve.status,permission?200:403);
+   assert.equal((await (await publicReviews({env})).json()).reviews.length,Number(permission));
+  });
+ }
 });
 
 test('no historical consent, wrong payment environment/amount, pending ride or reviewed invoice can trigger receipt delivery',async t=>{

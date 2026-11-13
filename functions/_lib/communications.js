@@ -74,7 +74,12 @@ function messageContent(kind,d,b){
  else if(kind==='quote_response'){text=`MVBRI: Your quote ${d.quoteReference} was ${d.action}.`;if(d.action==='accepted')text+=' Please pay the required 50% deposit.';if(d.url)links.push({label:'View your quote',url:d.url});}
  else if(kind==='quote_expired')text=`MVBRI: Quote ${d.quoteReference} expired before acceptance. Please contact us if you still need a ride.`;
  else if(kind==='deposit_paid')text=`MVBRI: Your 50% deposit of $${Number(d.amount).toFixed(2)} is verified for ride ${ref}. The remaining balance is due after your trip.`;
- else if(kind==='receipt'){subject='Your MVBRI receipt';text=`MVBRI: Thank you for riding with us. Your fare payment of $${Number(d.total).toFixed(2)} is verified. Your receipt is ready. Gratuities are optional.`;links.push({label:'View your receipt',url:d.receiptUrl},{label:'Leave an optional tip',url:d.tipUrl});}
+ else if(kind==='receipt'){
+  subject='Your MVBRI receipt';
+  text=`MVBRI: Thank you for riding with us. Your fare payment of $${Number(d.total).toFixed(2)} is verified. Your receipt is ready. Gratuities are optional.`;
+  links.push({label:'View your receipt',url:d.receiptUrl},{label:'Leave an optional tip',url:d.tipUrl});
+  if(b.channel==='email'&&d.reviewUrl)links.push({label:'Leave an optional review',url:d.reviewUrl});
+ }
  else throw new Error('Unknown customer update.');
  return {subject,text,links};
 }
