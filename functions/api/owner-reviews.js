@@ -129,10 +129,14 @@ export async function onRequestPost({ request, env }) {
     const updated = await env.DB.prepare(`
       UPDATE customer_reviews
       SET moderation_status = ?,
+          published_at = CASE WHEN ? = 'published'
+            THEN COALESCE(published_at, CURRENT_TIMESTAMP)
+            ELSE published_at
+          END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
         AND (? != 'published' OR permission_to_publish = 1)
-    `).bind(newStatus, reviewId, newStatus).run();
+    `).bind(newStatus, newStatus, reviewId, newStatus).run();
 
     if (updated.meta?.changes !== 1) {
       return json({

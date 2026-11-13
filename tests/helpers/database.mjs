@@ -5,14 +5,20 @@ export function database() {
   const sqlite = new DatabaseSync(':memory:');
   for (const file of ['0001_create_bookings.sql','migrations/0002_pricing_and_quotes.sql','0003_additional_stops.sql',
     '0004_mileage_usage.sql','0005_verified_reviews.sql','0006_square_payments.sql','0007_checkout_retries.sql',
-    '0008_balance_invoices.sql','0009_customer_messages.sql','0010_postride_receipts.sql','0011_tip_amounts.sql']) {
+    '0008_balance_invoices.sql','0009_customer_messages.sql','0010_postride_receipts.sql','0011_tip_amounts.sql',
+    '0012_review_publication_date.sql']) {
     sqlite.exec(readFileSync(new URL('../../migrations/'+file,import.meta.url),'utf8'));
   }
   const wrap = (sql, values=[]) => ({
     bind(...args) { return wrap(sql,args); },
     async first() { return sqlite.prepare(sql).get(...values) || null; },
     async all() { return {results:sqlite.prepare(sql).all(...values)}; },
-    async run() { const r=sqlite.prepare(sql).run(...values); return {meta:{changes:r.changes,last_row_id:r.lastInsertRowid}}; }
+    async run() {
+      const statement = sqlite.prepare(sql);
+      if (statement.columns().length) return { results: statement.all(...values) };
+      const result = statement.run(...values);
+      return { meta: { changes: result.changes, last_row_id: result.lastInsertRowid } };
+    }
   });
   return { sqlite, prepare:sql=>wrap(sql), async batch(statements) {
     sqlite.exec('BEGIN');

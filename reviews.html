@@ -27,6 +27,53 @@
       margin: 35px auto;
       padding: 0 20px;
     }
+    [hidden] { display: none !important; }
+    .ratings {
+      margin: 0 0 24px;
+      padding: 18px 22px;
+      border: 1px solid #e2e6eb;
+      border-radius: 12px;
+      background: white;
+    }
+    .ratings h3 { margin: 0 0 12px; font-size: 17px; }
+    .rating-counts {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin: 0;
+    }
+    .rating-counts div {
+      padding: 8px;
+      text-align: center;
+      border-radius: 6px;
+      background: #f7f5ee;
+    }
+    .rating-counts dt { color: #526173; font-size: 14px; }
+    .rating-counts dd { margin: 0; font-weight: bold; }
+    .sort, .pagination {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin: 0 0 18px;
+    }
+    .pagination { justify-content: center; }
+    select, button {
+      min-height: 44px;
+      padding: 8px 12px;
+      border: 1px solid #929eaa;
+      border-radius: 6px;
+      color: inherit;
+      background: white;
+      font: inherit;
+    }
+    button:enabled { cursor: pointer; }
+    button:disabled { opacity: .5; }
+    select:focus-visible, button:focus-visible {
+      outline: 2px solid #82651b;
+      outline-offset: 2px;
+    }
     .review {
       background: white;
       border: 1px solid #e2e6eb;
@@ -34,6 +81,15 @@
       padding: 24px;
       margin-bottom: 20px;
     }
+    .review-heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px 20px;
+    }
+    .review-heading h3 { margin: 0; overflow-wrap: anywhere; }
+    .review-date { color: #526173; font-size: 14px; }
     .stars {
       color: #b8860b;
       font-size: 23px;
@@ -47,11 +103,18 @@
       border-radius: 5px;
     }
     .status { text-align: center; padding: 20px; }
+    .status:empty { padding: 0; }
     a { color: inherit; }
     footer {
       text-align: center;
       padding: 28px 20px;
       color: #526173;
+    }
+    @media (max-width: 480px) {
+      .ratings { padding: 14px; }
+      .rating-counts { gap: 4px; }
+      .rating-counts div { padding: 6px 2px; }
+      .sort { justify-content: flex-start; }
     }
   </style>
 <link rel="icon" href="/favicon.ico?v=2" sizes="any">
@@ -66,16 +129,38 @@
   </header>
 
   <main>
-    <p>
-      Read feedback from customers who have
-      experienced MVBRI private driver services.
-    </p>
+    <section id="ratings" class="ratings" aria-labelledby="ratingsHeading" hidden>
+      <h3 id="ratingsHeading">Ratings breakdown</h3>
+      <dl class="rating-counts">
+        <div><dt>5 stars</dt><dd id="rating5">0</dd></div>
+        <div><dt>4 stars</dt><dd id="rating4">0</dd></div>
+        <div><dt>3 stars</dt><dd id="rating3">0</dd></div>
+        <div><dt>2 stars</dt><dd id="rating2">0</dd></div>
+        <div><dt>1 star</dt><dd id="rating1">0</dd></div>
+      </dl>
+    </section>
+
+    <div id="sortControls" class="sort" hidden>
+      <label for="reviewSort">Sort by</label>
+      <select id="reviewSort">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="highest">Highest rated</option>
+        <option value="lowest">Lowest rated</option>
+      </select>
+    </div>
 
     <div id="reviewsStatus" class="status" role="status">
       Loading customer reviews...
     </div>
 
     <div id="reviewsList"></div>
+
+    <nav id="reviewPagination" class="pagination" aria-label="Review pages" hidden>
+      <button id="previousReviews" type="button">Previous</button>
+      <span id="reviewPageStatus" role="status"></span>
+      <button id="nextReviews" type="button">Next</button>
+    </nav>
 
     <p><a href="/">← Return to MVBRI Home</a></p>
   </main>
@@ -85,61 +170,118 @@
   </footer>
 
   <script>
-    async function loadReviews() {
-      const status = document.getElementById('reviewsStatus');
-      const list = document.getElementById('reviewsList');
+    const status = document.getElementById('reviewsStatus');
+    const list = document.getElementById('reviewsList');
+    const sort = document.getElementById('reviewSort');
+    const previous = document.getElementById('previousReviews');
+    const next = document.getElementById('nextReviews');
+    const dateFormat = new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeZone: 'America/Chicago'
+    });
+    let page = 1;
+    let pages = 1;
+    let currentSort = sort.value;
+    let activeRequest;
+
+    function appendDate(parent, timestamp, label) {
+      if (!timestamp) return;
+      const date = new Date(timestamp.includes(' ') ? timestamp.replace(' ', 'T') + 'Z' : timestamp);
+      if (Number.isNaN(date.getTime())) return;
+      const time = document.createElement('time');
+      time.className = 'review-date';
+      time.dateTime = date.toISOString();
+      time.textContent = label + ' ' + dateFormat.format(date);
+      parent.append(time);
+    }
+
+    function reviewCard(review) {
+      const card = document.createElement('article');
+      card.className = 'review';
+
+      const heading = document.createElement('div');
+      heading.className = 'review-heading';
+      const name = document.createElement('h3');
+      name.textContent = review.customer_name || 'MVBRI Customer';
+      heading.append(name);
+
+      appendDate(heading, review.published_at || review.created_at,
+        review.published_at ? 'Published' : 'Submitted');
+
+      const stars = document.createElement('div');
+      stars.className = 'stars';
+      stars.setAttribute('role', 'img');
+      stars.setAttribute('aria-label', review.rating + ' out of 5 stars');
+      stars.textContent = '★'.repeat(review.rating);
+
+      const feedback = document.createElement('p');
+      feedback.textContent = review.feedback || '';
+      card.append(heading, stars, feedback);
+
+      if (review.owner_response) {
+        const reply = document.createElement('div');
+        reply.className = 'owner-reply';
+        const replyHeading = document.createElement('div');
+        replyHeading.className = 'review-heading';
+        const label = document.createElement('strong');
+        label.textContent = 'Response from MVBRI';
+        replyHeading.append(label);
+        appendDate(replyHeading, review.owner_response_at, 'Replied');
+        const text = document.createElement('p');
+        text.textContent = review.owner_response;
+        reply.append(replyHeading, text);
+        card.append(reply);
+      }
+      return card;
+    }
+
+    async function loadReviews(requestedPage = 1) {
+      activeRequest?.abort();
+      const controller = new AbortController();
+      activeRequest = controller;
+      const requestedSort = sort.value;
+      status.textContent = 'Loading customer reviews…';
+      previous.disabled = next.disabled = true;
+      list.setAttribute('aria-busy', 'true');
 
       try {
-        const response = await fetch('/api/reviews');
+        const params = new URLSearchParams({ sort: requestedSort, page: requestedPage });
+        const response = await fetch('/api/reviews?' + params, { signal: controller.signal });
         if (!response.ok) throw new Error('Reviews unavailable.');
+        const { reviews, ratingCounts, total, pageSize } = await response.json();
+        if (controller.signal.aborted) return;
 
-        const data = await response.json();
-        const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+        const lastPage = Math.max(1, Math.ceil(total / pageSize));
+        if (requestedPage > lastPage) return loadReviews(lastPage);
 
-        status.textContent = reviews.length
-          ? ''
-          : 'No published customer reviews yet. Please check back soon.';
-
-        for (const review of reviews) {
-          const card = document.createElement('article');
-          card.className = 'review';
-
-          const name = document.createElement('h3');
-          name.textContent = review.customer_name || 'MVBRI Customer';
-
-          const stars = document.createElement('div');
-          stars.className = 'stars';
-          stars.textContent = '★'.repeat(
-            Math.max(0, Math.min(5, Number(review.rating) || 0))
-          );
-
-          const feedback = document.createElement('p');
-          feedback.textContent = review.feedback || '';
-
-          card.append(name, stars, feedback);
-
-          if (review.owner_response) {
-            const reply = document.createElement('div');
-            reply.className = 'owner-reply';
-
-            const label = document.createElement('strong');
-            label.textContent = 'Response from MVBRI';
-
-            const text = document.createElement('p');
-            text.textContent = review.owner_response;
-
-            reply.append(label, text);
-            card.append(reply);
-          }
-
-          list.append(card);
+        list.replaceChildren(...reviews.map(reviewCard));
+        for (const [rating, count] of Object.entries(ratingCounts)) {
+          document.getElementById('rating' + rating).textContent = count.toLocaleString('en-US');
         }
+        page = requestedPage;
+        pages = lastPage;
+        currentSort = requestedSort;
+        document.getElementById('ratings').hidden = false;
+        document.getElementById('sortControls').hidden = total === 0;
+        document.getElementById('reviewPagination').hidden = pages === 1;
+        document.getElementById('reviewPageStatus').textContent = 'Page ' + page + ' of ' + pages;
+        status.textContent = total === 0 ? 'No published customer reviews yet.' : '';
       } catch (error) {
-        status.textContent =
-          'Customer reviews are temporarily unavailable.';
+        if (controller.signal.aborted) return;
+        sort.value = currentSort;
+        status.textContent = 'Could not load customer reviews. Please try again.';
+      } finally {
+        if (activeRequest === controller) {
+          previous.disabled = page === 1;
+          next.disabled = page === pages;
+          list.removeAttribute('aria-busy');
+        }
       }
     }
 
+    sort.addEventListener('change', () => loadReviews());
+    previous.addEventListener('click', () => loadReviews(page - 1));
+    next.addEventListener('click', () => loadReviews(page + 1));
     loadReviews();
   </script>
 </body>

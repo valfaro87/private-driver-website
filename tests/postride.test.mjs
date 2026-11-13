@@ -86,10 +86,10 @@ test('receipt email review links verify full fare, accept one review per ride, a
    assert.equal((await verify()).status,409);
    const review = await DB.prepare('SELECT id,permission_to_publish FROM customer_reviews').first();
    assert.equal(review.permission_to_publish,Number(permission));
-   assert.equal((await (await publicReviews({env})).json()).reviews.length,0);
+   assert.equal((await (await publicReviews({env,request:request('/api/reviews')})).json()).reviews.length,0);
    const approve = await moderateReview({env,request:request('/api/owner-reviews',{review_id:review.id,action:'publish'},true)});
    assert.equal(approve.status,permission?200:403);
-   assert.equal((await (await publicReviews({env})).json()).reviews.length,Number(permission));
+   assert.equal((await (await publicReviews({env,request:request('/api/reviews')})).json()).reviews.length,Number(permission));
   });
  }
 });
