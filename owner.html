@@ -48,6 +48,7 @@
     <label for="filter">Show</label>
     <select id="filter"><option value="">All bookings</option><option value="new">New requests</option><option value="confirmed">Confirmed</option><option value="contacted">Contacted</option><option value="declined">Declined</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
     <button class="btn ghost" id="refreshBtn" type="button">Refresh</button>
+    <a class="btn ghost" href="#quoteHistoryPanel">Ride quotes</a>
     <span id="dashStatus" class="status" role="status" aria-live="polite"></span>
   </div>
   <div id="bookingList" class="list"></div>
@@ -111,7 +112,21 @@
   <button class="btn" id="savePricingBtn" type="button">Save pricing settings</button>
   <div id="pricingStatus" class="status" role="status" aria-live="polite"></div>
 </section>
-  
+<section id="quoteHistoryPanel" class="panel hidden">
+  <h2>Ride quotes</h2>
+  <p>Archive old or test quotes to move them out of your current list. You can restore them anytime.</p>
+  <div class="toolbar">
+    <label for="quoteHistoryView">Show</label>
+    <select id="quoteHistoryView">
+      <option value="current">Current quotes</option>
+      <option value="archived">Archived quotes</option>
+    </select>
+    <button id="refreshQuoteHistoryBtn" class="btn ghost" type="button">Refresh quotes</button>
+  </div>
+  <div id="quoteHistoryStatus" class="status" role="status" aria-live="polite"></div>
+  <div id="quoteHistoryList" class="list"></div>
+</section>
+
 <section id="quotesPanel" class="panel hidden">
   <div class="ref">OWNER TOOLS</div>
   <h2>Create a ride quote</h2>
@@ -335,7 +350,9 @@ function showDashboard(show){
     document.getElementById('quoteOwnerNotes').value='';
     document.getElementById('replaceQuoteReference').value='';
     document.getElementById('replaceQuoteLinkResult').replaceChildren();
-    for (const id of ['quoteBookingDetails','quoteStatus','mileageStatus','ownerReviewsStatus','replaceQuoteLinkStatus']) {
+    document.getElementById('quoteHistoryList').replaceChildren();
+    document.getElementById('quoteHistoryView').value='current';
+    for (const id of ['quoteBookingDetails','quoteStatus','mileageStatus','ownerReviewsStatus','replaceQuoteLinkStatus','quoteHistoryStatus']) {
       document.getElementById(id).textContent='';
     }
   }
@@ -344,6 +361,7 @@ function showDashboard(show){
   logoutBtn.classList.toggle('hidden', !show);
   pricingPanel.classList.toggle('hidden', !show);
   quotesPanel.classList.toggle('hidden', !show);
+  document.getElementById('quoteHistoryPanel').classList.toggle('hidden', !show);
   document.getElementById('replaceQuoteLinkPanel')
     .classList.toggle('hidden', !show);
 
@@ -354,6 +372,7 @@ function showDashboard(show){
     loadOwnerReviews();
     loadPricingSettings();
     loadQuoteBookings();
+    loadQuoteHistory();
   }
 }
 function safeText(value){return String(value??'');}
@@ -613,6 +632,64 @@ const quoteBookingSelect = document.getElementById('quoteBooking');
 const quoteStatus = document.getElementById('quoteStatus');
 const quotePreview = document.getElementById('quotePreview');
 
+const quoteHistoryView = document.getElementById('quoteHistoryView');
+const quoteHistoryList = document.getElementById('quoteHistoryList');
+const quoteHistoryStatus = document.getElementById('quoteHistoryStatus');
+let quoteHistoryRequest = 0;
+
+function quoteHistoryCard(quote) {
+  const article = make('article', 'booking');
+  const head = make('div', 'bookinghead');
+  head.append(make('strong', '', quote.reference + ' · ' + quote.name), make('span', 'pill', quote.status));
+  const amount = quote.final_fare_cents === null ? 'Fare unavailable' : balanceMoney(quote.final_fare_cents / 100);
+  const created = new Date(quote.created_at).toLocaleDateString();
+  const archived = Boolean(quote.archived_at);
+  const actionText = archived ? 'Restore' : 'Archive';
+  const action = make('button', 'btn ghost', actionText);
+  action.type = 'button';
+  action.setAttribute('aria-label', actionText + ' quote ' + quote.reference);
+  action.addEventListener('click', async () => {
+    action.disabled = true;
+    try {
+      await api('/api/owner-quotes', {
+        method: 'PATCH',
+        body: JSON.stringify({ reference: quote.reference, archived: !archived })
+      });
+      if (!ownerActive) return;
+      const message = quote.reference + (archived ? ' restored.' : ' archived.');
+      await Promise.all([loadQuoteHistory(message), loadBookings()]);
+    } catch (error) {
+      if (ownerActive) quoteHistoryStatus.textContent = error.message;
+    } finally {
+      action.disabled = false;
+    }
+  });
+  article.append(head, make('p', 'notes', quote.booking_reference + ' · ' + amount + ' · Created ' + created), action);
+  return article;
+}
+
+async function loadQuoteHistory(message = '') {
+  if (!ownerActive) return;
+  const generation = ++quoteHistoryRequest;
+  const view = quoteHistoryView.value;
+  quoteHistoryList.replaceChildren();
+  quoteHistoryStatus.textContent = 'Loading quotes…';
+  try {
+    const result = await api('/api/owner-quotes?view=' + view);
+    if (!ownerActive || generation !== quoteHistoryRequest) return;
+    const quotes = result.quotes || [];
+    quoteHistoryList.replaceChildren(...quotes.map(quoteHistoryCard));
+    quoteHistoryStatus.textContent = message || (quotes.length
+      ? quotes.length + (quotes.length === 1 ? ' quote' : ' quotes')
+      : (view === 'archived' ? 'No archived quotes.' : 'No current quotes.'));
+  } catch (error) {
+    if (ownerActive && generation === quoteHistoryRequest) quoteHistoryStatus.textContent = error.message;
+  }
+}
+
+quoteHistoryView.addEventListener('change', () => loadQuoteHistory());
+document.getElementById('refreshQuoteHistoryBtn').addEventListener('click', () => loadQuoteHistory());
+
 const replaceQuoteLinkBtn =
   document.getElementById('replaceQuoteLinkBtn');
 
@@ -869,6 +946,7 @@ issueButton.addEventListener('click', async () => {
     quoteStatus.textContent = issued.notificationQueued ?
       'Quote issued. The customer update is queued through their selected channel.' :
       'Quote issued. This customer has not selected automated updates; the link is available above.';
+    loadQuoteHistory();
   } catch (error) {
     quoteStatus.textContent = error.message;
     issueButton.disabled = false;
@@ -878,6 +956,7 @@ issueButton.addEventListener('click', async () => {
 quotePreview.append(issueButton);
     quoteStatus.textContent =
       'Draft saved. Review the amount before issuing a quote.';
+    loadQuoteHistory();
   } catch (error) {
     quoteStatus.textContent = error.message;
   }

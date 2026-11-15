@@ -1,5 +1,6 @@
 import { json, ownerSession, sameOrigin } from "../_lib/auth.js";
 import {validatePreference,preferenceStatement,notificationStatement,wakeCommunications} from '../_lib/communications.js';
+import { excludeArchivedQuotes } from "../_lib/quote-archive.js";
 
 const clean = (value, max = 500) =>
   String(value ?? "").trim().replace(/\u0000/g, "").slice(0, max);
@@ -422,6 +423,7 @@ export async function onRequestGet({ request, env }) {
   ];
 
   try {
+    const archiveFilter = await excludeArchivedQuotes(env.DB);
     const query = `
       SELECT
         b.reference,
@@ -447,6 +449,7 @@ export async function onRequestGet({ request, env }) {
           FROM ride_quotes q
           WHERE q.booking_reference = b.reference
             AND q.status = 'accepted'
+            ${archiveFilter}
           ORDER BY q.updated_at DESC, q.created_at DESC
           LIMIT 1
         ) AS accepted_quote_reference,
@@ -456,6 +459,7 @@ export async function onRequestGet({ request, env }) {
           FROM ride_quotes q
           WHERE q.booking_reference = b.reference
             AND q.status = 'accepted'
+            ${archiveFilter}
           ORDER BY q.updated_at DESC, q.created_at DESC
           LIMIT 1
         ) AS accepted_quote_fare_cents

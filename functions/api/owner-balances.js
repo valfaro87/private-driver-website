@@ -4,6 +4,7 @@ import { paymentSummary, squareConfig } from '../_lib/square.js';
 import { isInvoiceBalance, prepareBalanceInvoice, reconcileBalanceInvoice } from '../_lib/square-balance.js';
 import { verifyPayPalPayments } from '../_lib/paypal.js';
 import { paypalConfig } from '../_lib/paypal-config.js';
+import { excludeArchivedQuotes } from '../_lib/quote-archive.js';
 
 async function authorized(request,env) {
   if (!env.DB || !(squareConfig(env) || paypalConfig(env, env.PAYPAL_SANDBOX_TEST_QUOTE))) {
@@ -15,9 +16,10 @@ async function authorized(request,env) {
 export async function onRequestGet({request,env}) {
   const rejected = await authorized(request,env); if(rejected)return rejected;
   try {
+    const archiveFilter = await excludeArchivedQuotes(env.DB);
     const quotes = (await env.DB.prepare(`SELECT q.reference,q.booking_reference,q.status,q.final_fare_cents,
       b.name,b.status AS booking_status FROM ride_quotes q JOIN bookings b ON b.reference=q.booking_reference
-      WHERE q.status='accepted' ORDER BY q.created_at DESC LIMIT 500`).all()).results || [];
+      WHERE q.status='accepted' ${archiveFilter} ORDER BY q.created_at DESC LIMIT 500`).all()).results || [];
     const balances = [];
     for(const quote of quotes) {
       const payments = await paymentSummary(env,quote);
